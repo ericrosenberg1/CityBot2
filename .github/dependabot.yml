@@ -1,0 +1,6 @@
+version: 2
+updates:
+  - package-ecosystem: "npm" # or "pip", "maven", etc.
+    directory: "/" # Directory containing dependencies
+    schedule:
+      interval: "daily"
