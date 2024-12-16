@@ -91,4 +91,4 @@ class WeatherMapGenerator:
             # Add post-processing effects
             self._enhance_image(output_path)
 
-            logger.info(f"Generated
+            logger.info(f"Generated)

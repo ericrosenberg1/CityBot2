@@ -30,6 +30,42 @@ logging.basicConfig(
 
 logger = logging.getLogger('CityBot2')
 
+class SocialMediaHandler:
+    def __init__(self, networks: Dict[str, Any]):
+        self.networks = networks
+        self.active_networks = {}
+        
+        for name, config in networks.items():
+            try:
+                if self._validate_network(name, config):
+                    self.active_networks[name] = config
+                    logger.info(f"Successfully initialized {name}")
+            except Exception as e:
+                logger.warning(f"Skipping {name} due to: {str(e)}")
+                
+    def _validate_network(self, name: str, config: Dict) -> bool:
+        if name == "twitter":
+            return all(k in config for k in ["api_key", "api_secret"])
+        elif name == "facebook":
+            return all(k in config for k in ["access_token"])
+        return False
+
+    async def post_content(self, content: Dict[str, Any]) -> Dict[str, bool]:
+        results = {}
+        for name, network in self.active_networks.items():
+            try:
+                success = await self._post_to_network(name, network, content)
+                results[name] = success
+                logger.info(f"Posted to {name}: {success}")
+            except Exception as e:
+                logger.error(f"Failed to post to {name}: {str(e)}")
+                results[name] = False
+        return results
+
+    async def _post_to_network(self, name: str, network: Dict, content: Dict) -> bool:
+        # Implement actual posting logic here
+        pass
+
 class CityBot:
     def __init__(self, city_name: str = "ventura"):
         """Initialize the bot and its components."""
@@ -50,6 +86,9 @@ class CityBot:
             self.weather_monitor = WeatherMonitor(self.config['weather'], self.city_config)
             self.earthquake_monitor = EarthquakeMonitor(self.config['earthquake'], self.city_config)
             self.news_monitor = NewsMonitor(self.config['news'], self.city_config)
+            
+            # Initialize social media components with error handling
+            self.social_handler = SocialMediaHandler(self.social_config)
             self.social_media = SocialMediaManager(self.social_config, self.city_config)
             self.rate_limiter = RateLimiter()
             self.weather_map_generator = WeatherMapGenerator(config=self.city_config)
@@ -106,27 +145,29 @@ class CityBot:
         """Regular weather updates task."""
         while self.running:
             try:
-                # Get current conditions
                 conditions = await self.weather_monitor.get_current_conditions()
                 if conditions:
-                    # Generate weather map
                     map_path = self.weather_map_generator.generate_weather_map(conditions)
                     if map_path:
                         conditions['map_path'] = map_path
                     
-                    # Post to social media if rate limits allow
                     if self.rate_limiter.can_post('weather', 'regular'):
-                        await self.social_media.post_weather(conditions)
+                        post_results = await self.social_handler.post_content({
+                            'type': 'weather',
+                            'data': conditions
+                        })
                         self.rate_limiter.record_post('weather', 'regular')
-                        logger.info(f"Posted weather update for {self.city_config['name']}")
+                        logger.info(f"Weather update post results: {post_results}")
 
-                # Check for alerts
                 alerts = await self.weather_monitor.get_alerts()
                 for alert in alerts:
                     if self.rate_limiter.can_post('weather', 'alert'):
-                        await self.social_media.post_weather_alert(alert)
+                        post_results = await self.social_handler.post_content({
+                            'type': 'weather_alert',
+                            'data': alert
+                        })
                         self.rate_limiter.record_post('weather', 'alert')
-                        logger.info(f"Posted weather alert for {self.city_config['name']}: {alert['event']}")
+                        logger.info(f"Weather alert post results: {post_results}")
 
             except Exception as e:
                 logger.error(f"Error in weather task: {str(e)}")
@@ -140,14 +181,16 @@ class CityBot:
                 earthquakes = await self.earthquake_monitor.get_earthquakes()
                 for quake in earthquakes:
                     if self.rate_limiter.can_post('earthquake', 'alert'):
-                        # Generate earthquake map
                         map_path = self.map_generator.generate_earthquake_map(quake)
                         if map_path:
                             quake['map_path'] = map_path
                         
-                        await self.social_media.post_earthquake(quake)
+                        post_results = await self.social_handler.post_content({
+                            'type': 'earthquake',
+                            'data': quake
+                        })
                         self.rate_limiter.record_post('earthquake', 'alert')
-                        logger.info(f"Posted earthquake alert for {self.city_config['name']}: M{quake['magnitude']}")
+                        logger.info(f"Earthquake alert post results: {post_results}")
 
             except Exception as e:
                 logger.error(f"Error in earthquake task: {str(e)}")
@@ -161,15 +204,17 @@ class CityBot:
                 articles = await self.news_monitor.check_news()
                 for article in articles:
                     if self.rate_limiter.can_post('news', 'regular'):
-                        # Check if article has location data for map
                         if 'location_data' in article:
                             map_path = self.map_generator.generate_news_map(article['location_data'])
                             if map_path:
                                 article['map_path'] = map_path
                         
-                        await self.social_media.post_news(article)
+                        post_results = await self.social_handler.post_content({
+                            'type': 'news',
+                            'data': article
+                        })
                         self.rate_limiter.record_post('news', 'regular')
-                        logger.info(f"Posted news article for {self.city_config['name']}: {article['title']}")
+                        logger.info(f"News article post results: {post_results}")
 
             except Exception as e:
                 logger.error(f"Error in news task: {str(e)}")
