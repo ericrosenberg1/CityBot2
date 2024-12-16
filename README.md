@@ -13,22 +13,47 @@ This is a major upgrade and full rewrite of my original [CityBot](https://github
 
 ## Installation
 
-To install CityBot2, clone the repository to your system, then follow these steps:
+To install CityBot2, you can clone the respository to your system and run the installer.
 
-1. Edit configuration files:
-   - `nano config/credentials.env`
-   - `nano config/social_config.json`
+1. Clone the repository to your desired directory. I used /code/CityBot2.
 
-2. Start the service:
+Example:
+'''
+mkdir CityBot2
+cd CityBot2
+git clone https://github.com/ericrosenberg1/CityBot2
+'''
+
+2. Run the installer
+'''
+chmod +x install.sh #Ensure correct permissions for installer script
+./install.sh #Run installer script
+'''
+
+3. Edit configuration files:
+Navigate to the config directory (cd .. then cd config).
+
+Rename the credentials.env.example file to credentials.env and add your social network credentials:
+'''
+mv credentials.env.example credentials.env
+nano credentials.env
+'''
+
+Then update your social_config file with details for your city. Remove the example settings from Ventura, California.
+'''
+nano config/social_config.json
+'''
+
+4. Start the service:
    - `sudo systemctl start citybot`
 
-3. Enable service at boot:
+5. Enable service at boot:
    - `sudo systemctl enable citybot`
 
-4. Check service status:
+6. Check service status:
    - `sudo systemctl status citybot`
 
-5. View logs:
+7. View logs:
    - `tail -f logs/citybot.log`
 
 ## Dependencies
