@@ -1,14 +1,13 @@
 <a id="readme-top"></a>
 <!- PROJECT SHIELDS -->
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
+[Contributors][contributors-shield]][contributors-url]
+[Forks][forks-shield]][forks-url]
+[Stargazers][stars-shield]][stars-url]
+[Issues][issues-shield]][issues-url]
 
 <h3 align="center">CityBot2</h3>
 
 <!-- TABLE OF CONTENTS PLACEHOLDER-->
-<!--
 <details>
   <summary>Table of Contents</summary>
   <ol>
@@ -25,15 +24,15 @@
         <li><a href="#installation">Installation</a></li>
       </ul>
     </li>
+    <li><a href='dependencies'>Dependencies</a></li>
     <li><a href="#usage">Usage</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#contributors">Contributors</a></li>
     <li><a href="#license">License</a></li>
-    <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
 </details>
--->
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
@@ -51,7 +50,7 @@ This is a major upgrade and full rewrite of my original (archived) [CityBot](htt
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Built With
-* [![Python][Python]][Python-url]
+* [Python][Python]][Python-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -79,29 +78,30 @@ To install CityBot2, you can clone the respository to your system and run the in
 1. Clone the repository to your desired directory. I used /code/CityBot2.
 
 Example:
-'''sh
-git clone https://github.com/ericrosenberg1/CityBot2
-'''
+   ```sh
+ git clone https://github.com/ericrosenberg1/CityBot2
+  ```
 
 2. Run the installer
-'''sh
-chmod +x install.sh  #Ensure correct permissions for installer script
+Follow these steps:
+   ```sh
+chmod +x install.sh  #Ensure correct permissions for the installer script
 ./install.sh         #Run installer script
-'''
+  ```
 
-3. Edit configuration files:
-Navigate to the config directory. Using the nano editor, add your social network credentials.
-''sh
+4. Edit configuration files:
+Navigate to the config directory. Using the Nano editor, add your social network credentials.
+   ```sh
 cd config
 mv credentials.env.example credentials.env
 nano credentials.env
-'''
+  ```
 Press CTRL+X and enter Y at the prompt to save and exit.
 
 Then update your social_config file with details for your city. Remove the example settings from Ventura, California.
-'''
+   ```sh
 nano config/social_config.json
-'''
+  ```
 Press CTRL+X and enter Y at the prompt to save and exit.
 
 4. Start the service:
@@ -170,7 +170,7 @@ Don't forget to give the project a star!
 
 For support, open an issue here on GitHub. For inquiries about commercial support, please contact the author via email using the contact form at [EricRosenberg.com](https://ericrosenberg.com).
 
-### Top contributors:
+### Contributors:
 
 <a href="https://github.com/ericrosenberg1/CityBot2/graphs/contributors">
 </a>
