@@ -1,12 +1,18 @@
 # CityBot2
 
-CityBot2 is a Python-based service that provides location-specific information and services. It offers functionalities related to retrieving weather data, maps, and social media integration to publish information on the city you choose and configure.
+CityBot2 is a Python-based app designed to create social media postings for a local area, with the initial version featuring news source RSS feeds and government-sourced data on weather, and earthquakes. It supports postings to Bluesky, Facebook, LinkedIn, Reddit, and Twitter/X.
+
+You can download it to your server and schedule it to run with customizations for your city. I'd love your help testing and improving!
+
+This is a major upgrade and full rewrite of my original [CityBot](https://github.com/ericrosenberg1/CityBot).
 
 [![Snyk](https://snyk.io/test/github/ericrosenberg1/CityBot2/badge.svg)](https://snyk.io/test/github/ericrosenberg1/CityBot2)
+[![Maintainability](https://api.codeclimate.com/v1/badges/4857f450946330748975/maintainability)](https://codeclimate.com/github/ericrosenberg1/CityBot2/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/4857f450946330748975/test_coverage)](https://codeclimate.com/github/ericrosenberg1/CityBot2/test_coverage)
 
 ## Installation
 
-To install CityBot2, follow these steps:
+To install CityBot2, clone the repository to your system, then follow these steps:
 
 1. Edit configuration files:
    - `nano config/credentials.env`
