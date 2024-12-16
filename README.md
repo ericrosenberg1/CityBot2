@@ -2,6 +2,8 @@
 
 CityBot2 is a Python-based service that provides location-specific information and services. It offers functionalities related to retrieving weather data, maps, and social media integration to publish information on the city you choose and configure.
 
+[![Snyk](https://snyk.io/test/github/ericrosenberg1/CityBot2/badge.svg)](https://snyk.io/test/github/ericrosenberg1/CityBot2)
+
 ## Installation
 
 To install CityBot2, follow these steps:
