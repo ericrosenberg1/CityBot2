@@ -2,7 +2,7 @@ aiohttp==3.10.11
 atproto==0.0.20
 tweepy==4.14.0
 facebook-sdk==3.1.0
-pillow==10.1.0
+pillow==10.3.0
 praw==7.7.1
 python-linkedin-v2==0.9.4
 instabot==0.117.0
