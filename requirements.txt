@@ -17,4 +17,4 @@ python-dotenv==1.0.0
 feedparser==6.0.10
 sqlalchemy==2.0.23
 colorama==0.4.6
-tqdm==4.66.1
+tqdm==4.66.3
