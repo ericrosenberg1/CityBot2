@@ -1,48 +1,108 @@
-# CityBot2
+<a id="readme-top"></a>
+<!- PROJECT SHIELDS -->
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
 
+<h3 align="center">CityBot2</h3>
+
+<!-- TABLE OF CONTENTS PLACEHOLDER-->
+<!--
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#built-with">Built With</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+</details>
+-->
+
+<!-- ABOUT THE PROJECT -->
+## About The Project
 CityBot2 is a Python-based app designed to create social media postings for a local area, with the initial version featuring news source RSS feeds and government-sourced data on weather, and earthquakes. It supports postings to Bluesky, Facebook, LinkedIn, Reddit, and Twitter/X.
 
 You can download it to your server and schedule it to run with customizations for your city. I'd love your help testing and improving!
 
-This is a major upgrade and full rewrite of my original [CityBot](https://github.com/ericrosenberg1/CityBot).
+This is a major upgrade and full rewrite of my original (archived) [CityBot](https://github.com/ericrosenberg1/CityBot).
 
 [![Snyk](https://snyk.io/test/github/ericrosenberg1/CityBot2/badge.svg)](https://snyk.io/test/github/ericrosenberg1/CityBot2)
 [![Maintainability](https://api.codeclimate.com/v1/badges/4857f450946330748975/maintainability)](https://codeclimate.com/github/ericrosenberg1/CityBot2/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/4857f450946330748975/test_coverage)](https://codeclimate.com/github/ericrosenberg1/CityBot2/test_coverage)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/efb5beefe547465087883828710a7a11)](https://app.codacy.com/gh/ericrosenberg1/CityBot2/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
-## Installation
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-To install CityBot2, you can clone the respository to your system and run the installer.
+### Built With
+* [![Python][Python]][Python-url]
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- GETTING STARTED -->
+## Getting Started
+This app comes with no warranties or guarantees. Use it at your own risk. I suggest a using virtual environment to segregate the files and dependencies from the rest of your system. If you don't know what that means, you should probably do some more tinkering and come back when you're ready to roll.
+
+### Prerequisites
+Make sure you have the latest version of Python and setup a VENV where you can install dependencies. You'll also likely want an updated version of PIP.
+
+How to update Python: [How to Update Python](https://www.pythoncentral.io/how-to-update-python/).
+
+I suggest creating a new directory where you want to store the project, create a VENV there, and ensure pip is updated in that VENV.
+   ```sh
+ mkdir CityBot2
+ python3 -m venv venv
+ source venv/bin/activate
+ pip install --upgrade pip
+  ```
+
+### Installation
+
+To install CityBot2, you can clone the respository to your system and run the installer. It's reccomended you run this in a virtual environment.
 
 1. Clone the repository to your desired directory. I used /code/CityBot2.
 
 Example:
-'''
-mkdir CityBot2
-cd CityBot2
+'''sh
 git clone https://github.com/ericrosenberg1/CityBot2
 '''
 
 2. Run the installer
-'''
-chmod +x install.sh #Ensure correct permissions for installer script
-./install.sh #Run installer script
+'''sh
+chmod +x install.sh  #Ensure correct permissions for installer script
+./install.sh         #Run installer script
 '''
 
 3. Edit configuration files:
-Navigate to the config directory (cd .. then cd config).
-
-Rename the credentials.env.example file to credentials.env and add your social network credentials:
-'''
+Navigate to the config directory. Using the nano editor, add your social network credentials.
+''sh
+cd config
 mv credentials.env.example credentials.env
 nano credentials.env
 '''
+Press CTRL+X and enter Y at the prompt to save and exit.
 
 Then update your social_config file with details for your city. Remove the example settings from Ventura, California.
 '''
 nano config/social_config.json
 '''
+Press CTRL+X and enter Y at the prompt to save and exit.
 
 4. Start the service:
    - `sudo systemctl start citybot`
@@ -55,6 +115,8 @@ nano config/social_config.json
 
 7. View logs:
    - `tail -f logs/citybot.log`
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Dependencies
 
@@ -74,39 +136,66 @@ CityBot2 requires the following dependencies:
 - cutycapt
 
 ## Usage
+After updating the config files, you can run the bot and it should automatically post to your desired social media accounts. Check the error log if something isn't working.
 
-CityBot2 can be utilized to retrieve city-specific information. An example of usage is as follows:
+<!-- ROADMAP -->
+## Roadmap
 
-```bash
-python3 citybot.py
-```
+- [ ] Create documentation
+- [ ] Improve error handling
+- [ ] Create a basic web GUI
+- [ ] Make it easier to update information for new cities
+- [ ] Create package to install and use with PyPi or apt
 
-This command will start the bot for the default city "ventura." You can specify a different city by setting the `CITYBOT_CITY` environment variable.
+See the [open issues](https://github.com/ericrosenberg1/CityBot2/issues) for a full list of proposed features (and known issues).
 
-## Authors
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-CityBot2 was created by me, @EricRosenberg1.
-
+<!-- CONTRIBUTING -->
 ## Contributing
 
-Contributions to CityBot2 are welcome! If you encounter any bugs or issues, please report them by opening an issue [here](https://github.com/ericrosenberg1/CityBot2/issues).
+Contributions to CityBot2 are welcome! 
 
-For making contributions via pull requests (PR), follow these steps:
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-branch-name`).
-3. Make your changes.
-4. Commit your changes (`git commit -am 'Add new feature'`).
-5. Push to the branch (`git push origin feature/your-branch-name`).
-6. Create a new Pull Request.
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**. If you encounter any bugs or issues, please report them by opening an issue [here](https://github.com/ericrosenberg1/CityBot2/issues).
 
-For support or inquiries about commercial support, please contact the author via email using the contact form at https://ericrosenberg.com.
+If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
 
-## Additional Information
+Don't forget to give the project a star!
 
-For more details on the functionalities and capabilities of CityBot2, refer to the source code and documentation provided in the repository. Feel free to explore and enhance the service for your specific needs. 🌟
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## Thanks
+For support, open an issue here on GitHub. For inquiries about commercial support, please contact the author via email using the contact form at [EricRosenberg.com](https://ericrosenberg.com).
 
-The initial version of this readme was created using the  project [GPT4Readability](https://github.com/loevlie/GPT4Readability)
+### Top contributors:
 
-Much of the initial code was created using Claude.ai
+<a href="https://github.com/ericrosenberg1/CityBot2/graphs/contributors">
+</a>
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- LICENSE -->
+## License
+Distributed under the GPLv3 License. See 'LICENSE.txt' for more information.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- CONTACT -->
+<!-- CONTACT Placeholder
+## Contact
+
+Your Name - [@your_twitter](https://twitter.com/your_username) - email@example.com
+
+Project Link: [https://github.com/your_username/repo_name](https://github.com/your_username/repo_name)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+-->
+
+<!-- ACKNOWLEDGMENTS -->
+## Acknowledgments
+* Claude.ai for helping me create the first version of the code for this app
+* [GPT4Readability](https://github.com/loevlie/GPT4Readability) – Initial version of README.md and a cool AI-driven project
+* [Best-README-Template](https://github.com/othneildrew/Best-README-Template/tree/main) – Major improvemnts to the README.md file
