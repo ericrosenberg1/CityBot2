@@ -1,0 +1,16 @@
+[Unit]
+Description=CityBot2 Social Media Bot
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/CityBot2
+Environment=PATH=/home/pi/CityBot2/venv/bin
+ExecStart=/home/pi/CityBot2/venv/bin/python main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

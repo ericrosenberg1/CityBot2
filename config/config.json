@@ -1,0 +1,31 @@
+{
+    "weather": {
+        "update_interval": 21600,
+        "alert_check_interval": 900,
+        "radar_update_interval": 900,
+        "location": {
+            "latitude": 34.2805,
+            "longitude": -119.2945,
+            "city": "Ventura",
+            "state": "CA"
+        }
+    },
+    "earthquake": {
+        "check_interval": 300,
+        "minimum_magnitude": 3.0,
+        "radius_miles": 100
+    },
+    "news": {
+        "check_interval": 1800,
+        "max_daily_posts": 24,
+        "minimum_relevance_score": 0.7
+    },
+    "maintenance": {
+        "cleanup_interval": 86400,
+        "retention_days": 7
+    },
+    "cache": {
+        "weather_maps_dir": "cache/weather_maps",
+        "max_cache_age": 604800
+    }
+}
