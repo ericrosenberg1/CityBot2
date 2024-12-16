@@ -91,4 +91,35 @@ class WeatherMapGenerator:
             # Add post-processing effects
             self._enhance_image(output_path)
 
-            logger.info(f"Generated)
+            logger.info("Generated weather map successfully")
+            return output_path
+
+        except Exception as e:
+            logger.error(f"Error generating weather map: {str(e)}")
+            return None
+
+    def _add_radar_overlay(self, ax):
+        """Add radar overlay to the map."""
+        try:
+            radar_url = f"https://radar.weather.gov/ridge/standard/CONUS_{datetime.now().strftime('%Y%m%d_%H%M')}.gif"
+            response = requests.get(radar_url)
+            if response.status_code == 200:
+                img = Image.open(BytesIO(response.content))
+                ax.imshow(img, transform=ccrs.PlateCarree(), alpha=0.5)
+        except Exception as e:
+            logger.error(f"Error adding radar overlay: {str(e)}")
+
+    def _enhance_image(self, image_path: str):
+        """Add post-processing enhancements to the map."""
+        try:
+            img = Image.open(image_path)
+            draw = ImageDraw.Draw(img)
+            
+            if self.font_path:
+                font = ImageFont.truetype(self.font_path, 24)
+                draw.text((10, 10), self.config.get('name', 'Weather Map'), 
+                         font=font, fill='black')
+            
+            img.save(image_path, quality=95)
+        except Exception as e:
+            logger.error(f"Error enhancing image: {str(e)}")
