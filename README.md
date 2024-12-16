@@ -1,13 +1,12 @@
 <a id="readme-top"></a>
-<!- PROJECT SHIELDS -->
-[Contributors][contributors-shield]][contributors-url]
-[Forks][forks-shield]][forks-url]
-[Stargazers][stars-shield]][stars-url]
-[Issues][issues-shield]][issues-url]
+[![Contributors][contributors-shield]][contributors-url]
+[![Forks][forks-shield]][forks-url]
+[![Stargazers][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
 
 <h3 align="center">CityBot2</h3>
 
-<!-- TABLE OF CONTENTS PLACEHOLDER-->
+<!-- TABLE OF CONTENTS -->
 <details>
   <summary>Table of Contents</summary>
   <ol>
@@ -34,9 +33,8 @@
   </ol>
 </details>
 
-<!-- ABOUT THE PROJECT -->
 ## About The Project
-CityBot2 is a Python-based app designed to create social media postings for a local area, with the initial version featuring news source RSS feeds and government-sourced data on weather, and earthquakes. It supports postings to Bluesky, Facebook, LinkedIn, Reddit, and Twitter/X.
+CityBot2 is a Python-based app designed to create social media posts for a local area. The initial version features news source RSS feeds and government-sourced data on weather and earthquakes. It supports Bluesky, Facebook, LinkedIn, Reddit, and Twitter/X.
 
 You can download it to your server and schedule it to run with customizations for your city. I'd love your help testing and improving!
 
@@ -54,48 +52,52 @@ This is a major upgrade and full rewrite of my original (archived) [CityBot](htt
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-<!-- GETTING STARTED -->
 ## Getting Started
-This app comes with no warranties or guarantees. Use it at your own risk. I suggest a using virtual environment to segregate the files and dependencies from the rest of your system. If you don't know what that means, you should probably do some more tinkering and come back when you're ready to roll.
+This app comes with no warranties or guarantees. Use it at your own risk. I suggest using a virtual environment to segregate the files and dependencies from the rest of your system. If you don't know what that means, you should probably do some more tinkering and come back when you're ready to roll.
 
 ### Prerequisites
-Make sure you have the latest version of Python and setup a VENV where you can install dependencies. You'll also likely want an updated version of PIP.
+Make sure you have the latest version of Python and set up a VENV where you can install dependencies. You'll also likely want an updated version of PIP.
 
 How to update Python: [How to Update Python](https://www.pythoncentral.io/how-to-update-python/).
 
-I suggest creating a new directory where you want to store the project, create a VENV there, and ensure pip is updated in that VENV.
+I suggest creating a new directory where you want to store the project, create a VENV, and ensure pip is updated in that VENV.
    ```sh
- mkdir CityBot2
- python3 -m venv venv
- source venv/bin/activate
- pip install --upgrade pip
+mkdir CityBot2
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
   ```
 
 ### Installation
 
-To install CityBot2, you can clone the respository to your system and run the installer. It's reccomended you run this in a virtual environment.
+To install CityBot2, you can clone the repository to your system and run the installer. It's recommended that you run in a virtual environment.
 
 1. Clone the repository to your desired directory. I used /code/CityBot2.
 
 Example:
    ```sh
- git clone https://github.com/ericrosenberg1/CityBot2
+git clone https://github.com/ericrosenberg1/CityBot2
   ```
 
 2. Run the installer
-Follow these steps:
+To install, set permissions for the install.sh file and run it with these commands:
+
+Example:
    ```sh
-chmod +x install.sh  #Ensure correct permissions for the installer script
-./install.sh         #Run installer script
+chmod +x install.sh
+./install.sh
   ```
 
 4. Edit configuration files:
 Navigate to the config directory. Using the Nano editor, add your social network credentials.
+
+Enter these commands in your terminal:
    ```sh
 cd config
 mv credentials.env.example credentials.env
 nano credentials.env
   ```
+
 Press CTRL+X and enter Y at the prompt to save and exit.
 
 Then update your social_config file with details for your city. Remove the example settings from Ventura, California.
@@ -138,7 +140,6 @@ CityBot2 requires the following dependencies:
 ## Usage
 After updating the config files, you can run the bot and it should automatically post to your desired social media accounts. Check the error log if something isn't working.
 
-<!-- ROADMAP -->
 ## Roadmap
 
 - [ ] Create documentation
@@ -151,7 +152,6 @@ See the [open issues](https://github.com/ericrosenberg1/CityBot2/issues) for a f
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-<!-- CONTRIBUTING -->
 ## Contributing
 
 Contributions to CityBot2 are welcome! 
@@ -177,7 +177,6 @@ For support, open an issue here on GitHub. For inquiries about commercial suppor
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-<!-- LICENSE -->
 ## License
 Distributed under the GPLv3 License. See 'LICENSE.txt' for more information.
 
@@ -194,7 +193,6 @@ Project Link: [https://github.com/your_username/repo_name](https://github.com/yo
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 -->
 
-<!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 * Claude.ai for helping me create the first version of the code for this app
 * [GPT4Readability](https://github.com/loevlie/GPT4Readability) – Initial version of README.md and a cool AI-driven project
