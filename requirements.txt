@@ -1,4 +1,4 @@
-aiohttp==3.9.1
+aiohttp==3.10.11
 atproto==0.0.20
 tweepy==4.14.0
 facebook-sdk==3.1.0
