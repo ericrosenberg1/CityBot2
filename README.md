@@ -9,6 +9,7 @@ This is a major upgrade and full rewrite of my original [CityBot](https://github
 [![Snyk](https://snyk.io/test/github/ericrosenberg1/CityBot2/badge.svg)](https://snyk.io/test/github/ericrosenberg1/CityBot2)
 [![Maintainability](https://api.codeclimate.com/v1/badges/4857f450946330748975/maintainability)](https://codeclimate.com/github/ericrosenberg1/CityBot2/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/4857f450946330748975/test_coverage)](https://codeclimate.com/github/ericrosenberg1/CityBot2/test_coverage)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/efb5beefe547465087883828710a7a11)](https://app.codacy.com/gh/ericrosenberg1/CityBot2/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 ## Installation
 
@@ -73,7 +74,7 @@ For making contributions via pull requests (PR), follow these steps:
 5. Push to the branch (`git push origin feature/your-branch-name`).
 6. Create a new Pull Request.
 
-For support or inquiries about commercial support, please contact [Author Name] via email.
+For support or inquiries about commercial support, please contact the author via email using the contact form at https://ericrosenberg.com.
 
 ## Additional Information
 
@@ -81,5 +82,6 @@ For more details on the functionalities and capabilities of CityBot2, refer to t
 
 ## Thanks
 
-*The initial version of this readme was created using the  project [GPT4Readability](https://github.com/loevlie/GPT4Readability)
-*Much of the initial code was created using Claude.ai
+The initial version of this readme was created using the  project [GPT4Readability](https://github.com/loevlie/GPT4Readability)
+
+Much of the initial code was created using Claude.ai
