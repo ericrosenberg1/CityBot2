@@ -16,6 +16,7 @@ from social_media.manager import SocialMediaManager
 from social_media.utils.rate_limiter import RateLimiter
 from social_media.utils.image_generator import WeatherMapGenerator
 from social_media.utils.map_generator import MapGenerator
+from config import load_city_config
 
 # Configure logging
 logging.basicConfig(
@@ -30,26 +31,29 @@ logging.basicConfig(
 logger = logging.getLogger('CityBot2')
 
 class CityBot:
-    def __init__(self):
+    def __init__(self, city_name: str = "ventura"):
         """Initialize the bot and its components."""
         try:
-            # Load configuration
+            # Load configurations
             with open('config/config.json') as f:
                 self.config = json.load(f)
 
-            # Load social media configuration
             with open('config/social_config.json') as f:
                 self.social_config = json.load(f)
 
-            # Initialize components
+            # Load city-specific configuration
+            self.city_config = load_city_config(city_name)
+            logger.info(f"Loaded configuration for {self.city_config['name']}, {self.city_config['state']}")
+
+            # Initialize components with city configuration
             self.db = DatabaseManager()
-            self.weather_monitor = WeatherMonitor(self.config['weather'])
-            self.earthquake_monitor = EarthquakeMonitor(self.config['earthquake'])
-            self.news_monitor = NewsMonitor(self.config['news'])
-            self.social_media = SocialMediaManager(self.social_config)
+            self.weather_monitor = WeatherMonitor(self.config['weather'], self.city_config)
+            self.earthquake_monitor = EarthquakeMonitor(self.config['earthquake'], self.city_config)
+            self.news_monitor = NewsMonitor(self.config['news'], self.city_config)
+            self.social_media = SocialMediaManager(self.social_config, self.city_config)
             self.rate_limiter = RateLimiter()
-            self.weather_map_generator = WeatherMapGenerator(config=self.config['weather'])
-            self.map_generator = MapGenerator(config=self.config['weather'])
+            self.weather_map_generator = WeatherMapGenerator(config=self.city_config)
+            self.map_generator = MapGenerator(config=self.city_config)
 
             # Set up shutdown handler
             signal.signal(signal.SIGINT, self.shutdown_handler)
@@ -59,7 +63,7 @@ class CityBot:
             self.tasks = []
             self.running = True
 
-            logger.info("CityBot initialized successfully")
+            logger.info(f"CityBot initialized successfully for {self.city_config['name']}")
 
         except Exception as e:
             logger.error(f"Error initializing CityBot: {str(e)}")
@@ -114,7 +118,7 @@ class CityBot:
                     if self.rate_limiter.can_post('weather', 'regular'):
                         await self.social_media.post_weather(conditions)
                         self.rate_limiter.record_post('weather', 'regular')
-                        logger.info("Posted weather update successfully")
+                        logger.info(f"Posted weather update for {self.city_config['name']}")
 
                 # Check for alerts
                 alerts = await self.weather_monitor.get_alerts()
@@ -122,7 +126,7 @@ class CityBot:
                     if self.rate_limiter.can_post('weather', 'alert'):
                         await self.social_media.post_weather_alert(alert)
                         self.rate_limiter.record_post('weather', 'alert')
-                        logger.info(f"Posted weather alert: {alert['event']}")
+                        logger.info(f"Posted weather alert for {self.city_config['name']}: {alert['event']}")
 
             except Exception as e:
                 logger.error(f"Error in weather task: {str(e)}")
@@ -143,7 +147,7 @@ class CityBot:
                         
                         await self.social_media.post_earthquake(quake)
                         self.rate_limiter.record_post('earthquake', 'alert')
-                        logger.info(f"Posted earthquake alert: M{quake['magnitude']}")
+                        logger.info(f"Posted earthquake alert for {self.city_config['name']}: M{quake['magnitude']}")
 
             except Exception as e:
                 logger.error(f"Error in earthquake task: {str(e)}")
@@ -165,7 +169,7 @@ class CityBot:
                         
                         await self.social_media.post_news(article)
                         self.rate_limiter.record_post('news', 'regular')
-                        logger.info(f"Posted news article: {article['title']}")
+                        logger.info(f"Posted news article for {self.city_config['name']}: {article['title']}")
 
             except Exception as e:
                 logger.error(f"Error in news task: {str(e)}")
@@ -184,7 +188,7 @@ class CityBot:
 
     async def run(self):
         """Start the bot."""
-        logger.info("Starting CityBot...")
+        logger.info(f"Starting CityBot for {self.city_config['name']}...")
         
         try:
             # Initialize monitors
@@ -212,6 +216,9 @@ if __name__ == "__main__":
     for directory in ['logs', 'data', 'cache/weather_maps', 'cache/maps']:
         os.makedirs(directory, exist_ok=True)
 
+    # Get city name from environment variable or use default
+    city_name = os.getenv('CITYBOT_CITY', 'ventura')
+
     # Start the bot
-    bot = CityBot()
+    bot = CityBot(city_name)
     asyncio.run(bot.run())

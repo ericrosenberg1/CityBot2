@@ -7,15 +7,16 @@ from math import sin, cos, sqrt, atan2, radians
 logger = logging.getLogger('CityBot2.earthquake')
 
 class EarthquakeMonitor:
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, city_config: Dict):
         self.config = config
-        self.city_lat = 34.2805
-        self.city_lon = -119.2945
+        self.city_config = city_config
+        self.city_lat = city_config['coordinates']['latitude']
+        self.city_lon = city_config['coordinates']['longitude']
         self.base_url = "https://earthquake.usgs.gov/fdsnws/event/1/query"
         self.radius_km = self.config.get('radius_miles', 100) * 1.60934  # Convert miles to km
 
     def calculate_distance(self, lat: float, lon: float) -> float:
-        """Calculate distance in miles from Ventura to earthquake location."""
+        """Calculate distance in miles from city to earthquake location."""
         R = 3959.87433  # Earth's radius in miles
 
         lat1 = radians(self.city_lat)
@@ -56,7 +57,7 @@ class EarthquakeMonitor:
                 props = feature['properties']
                 coords = feature['geometry']['coordinates']
                 
-                # Calculate distance from Ventura
+                # Calculate distance from city
                 distance = self.calculate_distance(coords[1], coords[0])
                 
                 earthquakes.append({
@@ -70,7 +71,9 @@ class EarthquakeMonitor:
                     'alert': props.get('alert', None),
                     'status': props.get('status', 'automatic'),
                     'latitude': coords[1],
-                    'longitude': coords[0]
+                    'longitude': coords[0],
+                    'city': self.city_config['name'],
+                    'state': self.city_config['state']
                 })
             
             return earthquakes

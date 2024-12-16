@@ -7,16 +7,18 @@ import logging
 logger = logging.getLogger('CityBot2.weather')
 
 class WeatherMonitor:
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, city_config: Dict):
         self.config = config
-        self.latitude = 34.2805
-        self.longitude = -119.2945
+        self.city_config = city_config
+        self.latitude = city_config['coordinates']['latitude']
+        self.longitude = city_config['coordinates']['longitude']
         self.base_url = "https://api.weather.gov"
         self.headers = {
             "User-Agent": "CityBot2/1.0",
             "Accept": "application/geo+json"
         }
         self.grid_info = None
+        self.zone_code = city_config['weather']['zone_code']
 
     async def initialize(self):
         """Initialize grid coordinates for location."""
@@ -77,7 +79,9 @@ class WeatherMonitor:
                                             'wind_direction': obs_data['properties']['windDirection']['value'],
                                             'cloud_cover': obs_data['properties'].get('cloudLayers', [{}])[0].get('amount', 0),
                                             'forecast': current['shortForecast'],
-                                            'timestamp': datetime.now(timezone.utc)
+                                            'timestamp': datetime.now(timezone.utc),
+                                            'city': self.city_config['name'],
+                                            'state': self.city_config['state']
                                         }
             
             except Exception as e:
@@ -87,7 +91,7 @@ class WeatherMonitor:
     async def get_alerts(self) -> List[Dict]:
         """Get active weather alerts."""
         async with aiohttp.ClientSession() as session:
-            url = f"{self.base_url}/alerts/active/zone/CAZ039"  # Ventura County Coast
+            url = f"{self.base_url}/alerts/active/zone/{self.zone_code}"
             
             try:
                 async with session.get(url, headers=self.headers) as response:
@@ -105,7 +109,9 @@ class WeatherMonitor:
                                 'urgency': props['urgency'],
                                 'areas': props['areaDesc'],
                                 'onset': datetime.fromisoformat(props['onset'].replace('Z', '+00:00')),
-                                'expires': datetime.fromisoformat(props['expires'].replace('Z', '+00:00'))
+                                'expires': datetime.fromisoformat(props['expires'].replace('Z', '+00:00')),
+                                'city': self.city_config['name'],
+                                'state': self.city_config['state']
                             })
                         
                         return alerts

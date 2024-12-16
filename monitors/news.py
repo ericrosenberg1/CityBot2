@@ -11,50 +11,11 @@ from urllib.parse import urlparse
 logger = logging.getLogger('CityBot2.news')
 
 class NewsMonitor:
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, city_config: Dict):
         self.config = config
-        self.rss_feeds = {
-            "Ventura County Star": {
-                "url": "https://www.vcstar.com/rss",
-                "priority": 1
-            },
-            "KEYT News": {
-                "url": "https://keyt.com/feed",
-                "priority": 1
-            },
-            "Ventura County Reporter": {
-                "url": "https://vcreporter.com/feed",
-                "priority": 1
-            },
-            "KVTA News": {
-                "url": "https://www.kvta.com/news/rss",
-                "priority": 1
-            },
-            "LA Times": {
-                "url": "https://www.latimes.com/california/rss2.0.xml",
-                "priority": 2
-            },
-            "EdHat Santa Barbara": {
-                "url": "https://www.edhat.com/rss.xml",
-                "priority": 2
-            }
-        }
-        
-        self.location_keywords = {
-            'must_include': {'ventura'},
-            'at_least_one': {
-                'downtown ventura', 'ventura harbor', 'ventura pier',
-                'ventura promenade', 'san buenaventura',
-                'ventura county government center', 'ventura college',
-                'pacific view mall', 'community memorial hospital',
-                'ventura county fairgrounds', 'surfers point'
-            },
-            'exclude': {
-                'port hueneme', 'oxnard', 'camarillo', 'ojai',
-                'santa paula', 'fillmore', 'thousand oaks',
-                'simi valley', 'moorpark'
-            }
-        }
+        self.city_config = city_config
+        self.rss_feeds = city_config['news']['rss_feeds']
+        self.location_keywords = city_config['news']['location_keywords']
 
     def calculate_relevance_score(self, title: str, content: str) -> float:
         """Calculate relevance score for article."""
@@ -76,10 +37,11 @@ class NewsMonitor:
                 score -= 0.2
         
         # Bonus for city-specific mentions
+        city_name = self.city_config['name'].lower()
         city_patterns = [
-            r'\bcity of ventura\b',
-            r'\bventura city\b',
-            r'\bdowntown ventura\b'
+            f'\\b{city_name} city\\b',
+            f'\\bcity of {city_name}\\b',
+            f'\\bdowntown {city_name}\\b'
         ]
         for pattern in city_patterns:
             if re.search(pattern, text):

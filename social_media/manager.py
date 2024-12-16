@@ -9,18 +9,18 @@ from .platforms.linkedin import LinkedInPlatform
 from .platforms.reddit import RedditPlatform
 from .utils.rate_limiter import RateLimiter
 from .utils.content_validator import ContentValidator
-from .utils.image_generator import WeatherMapGenerator
-from .utils.map_generator import MapGenerator
 
 logger = logging.getLogger('CityBot2.social.manager')
 
 class SocialMediaManager:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], city_config: Dict[str, Any]):
         self.config = config
+        self.city_config = city_config
         self.platforms = {}
         self.rate_limiter = RateLimiter()
         self.content_validator = ContentValidator()
         self.initialize_platforms()
+        self.hashtags = city_config['social']['hashtags']
 
     def initialize_platforms(self):
         """Initialize all enabled social media platforms."""
@@ -50,23 +50,13 @@ class SocialMediaManager:
         for platform_name, platform in self.platforms.items():
             platform_config = self.config['platforms'][platform_name]
             
-            # Check if this post type is enabled for this platform
             if post_type in platform_config.get('post_types', []):
-                # Validate content for platform
-                errors = self.content_validator.validate_content(content, platform_name)
-                if errors:
-                    logger.warning(f"Content validation failed for {platform_name}: {errors}")
-                    results[platform_name] = False
-                    continue
-
-                # Check rate limits
                 if self.rate_limiter.can_post(platform_name, post_type):
                     tasks.append(self._post_to_platform(platform_name, platform, content))
                 else:
                     logger.info(f"Rate limit reached for {platform_name} - {post_type}")
                     results[platform_name] = False
 
-        # Wait for all posts to complete
         if tasks:
             completed_tasks = await asyncio.gather(*tasks, return_exceptions=True)
             results.update({platform: result for platform, result in zip(self.platforms.keys(), completed_tasks)})
@@ -74,7 +64,7 @@ class SocialMediaManager:
         return results
 
     async def _post_to_platform(self, platform_name: str, platform: Any, content: PostContent) -> bool:
-        """Post to a specific platform with error handling and rate limit recording."""
+        """Post to a specific platform with error handling."""
         try:
             success = await platform.post_update(content)
             if success:
@@ -87,36 +77,40 @@ class SocialMediaManager:
 
     def _format_weather_text(self, weather_data: Dict[str, Any]) -> str:
         """Format weather update text."""
+        hashtags = ' '.join([f"#{tag}" for tag in self.hashtags['weather']])
         return (
-            f"Weather Update for {self.config.get('city_name', 'City')}\n\n"
+            f"Weather Update for {self.city_config['name']}, {self.city_config['state']}\n\n"
             f"🌡️ Temperature: {weather_data['temperature']:.1f}°F\n"
             f"💨 Wind: {weather_data['wind_speed']:.1f}mph {weather_data['wind_direction']}\n"
             f"☁️ Cloud Cover: {weather_data['cloud_cover']}%\n\n"
             f"Forecast: {weather_data['forecast']}\n\n"
-            f"#{self.config.get('city_hashtag', 'City')}Weather #Weather"
+            f"{hashtags}"
         )
 
     def _format_earthquake_text(self, quake_data: Dict[str, Any]) -> str:
         """Format earthquake update text."""
         magnitude_emoji = "🔴" if quake_data['magnitude'] >= 5.0 else "🟡" if quake_data['magnitude'] >= 4.0 else "🟢"
+        hashtags = ' '.join([f"#{tag}" for tag in self.hashtags['earthquake']])
         
         return (
             f"{magnitude_emoji} EARTHQUAKE REPORT {magnitude_emoji}\n\n"
             f"Magnitude: {quake_data['magnitude']}\n"
             f"Location: {quake_data['location']}\n"
             f"Depth: {quake_data['depth']:.1f} km\n"
-            f"Distance from {self.config.get('city_name', 'City')}: {quake_data['distance']:.1f} miles\n\n"
-            f"#Earthquake #{self.config.get('city_hashtag', 'City')} #Earthquake"
+            f"Distance from {self.city_config['name']}: {quake_data['distance']:.1f} miles\n\n"
+            f"{hashtags}"
         )
 
     def _format_news_text(self, article_data: Dict[str, Any]) -> str:
         """Format news update text."""
+        hashtags = ' '.join([f"#{tag}" for tag in self.hashtags['news']])
+        
         return (
             f"📰 {article_data['title']}\n\n"
             f"{article_data['content_snippet']}\n\n"
             f"Source: {article_data['source']}\n"
             f"{article_data['url']}\n\n"
-            f"#{self.config.get('city_hashtag', 'City')}News #News"
+            f"{hashtags}"
         )
 
     async def post_weather(self, weather_data: Dict[str, Any]) -> Dict[str, bool]:
@@ -125,7 +119,7 @@ class SocialMediaManager:
             text=self._format_weather_text(weather_data),
             media=MediaContent(
                 image_path=weather_data.get('map_path'),
-                meta_title=f"{self.config.get('city_name', 'City')} Weather Update",
+                meta_title=f"{self.city_config['name']}, {self.city_config['state']} Weather Update",
                 meta_description=f"Current conditions: {weather_data['temperature']}°F, "
                                f"{weather_data['wind_speed']}mph winds"
             )
@@ -139,8 +133,8 @@ class SocialMediaManager:
             media=MediaContent(
                 image_path=quake_data.get('map_path'),
                 link_url=quake_data.get('url'),
-                meta_title=f"M{quake_data['magnitude']} Earthquake near {self.config.get('city_name', 'City')}",
-                meta_description=f"Earthquake detected {quake_data['distance']:.1f} miles from {self.config.get('city_name', 'City')}"
+                meta_title=f"M{quake_data['magnitude']} Earthquake near {self.city_config['name']}, {self.city_config['state']}",
+                meta_description=f"Earthquake detected {quake_data['distance']:.1f} miles from {self.city_config['name']}"
             )
         )
         return await self.post_content(content, 'earthquake')
