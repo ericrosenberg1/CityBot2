@@ -1,5 +1,5 @@
 aiohttp==3.10.11
-atproto==0.0.20
+blueskysocial==1.6.2
 tweepy==4.14.0
 facebook-sdk==3.1.0
 pillow==10.3.0
@@ -18,7 +18,8 @@ feedparser==6.0.10
 sqlalchemy==2.0.23
 colorama==0.4.6
 tqdm==4.66.3
-anyio>=4.4.0 # not directly required, pinned by Snyk to avoid a vulnerability
-setuptools>=70.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
-urllib3>=2.2.2 # not directly required, pinned by Snyk to avoid a vulnerability
-zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
+aiosqlite==0.19.0
+anyio>=4.4.0
+setuptools>=70.0.0
+urllib3>=2.2.2
+zipp>=3.19.1

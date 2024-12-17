@@ -11,10 +11,8 @@ from database.operations import DatabaseManager
 from monitors.weather import WeatherMonitor
 from monitors.earthquake import EarthquakeMonitor
 from monitors.news import NewsMonitor
-from social_media.manager import SocialMediaManager
-from social_media.utils.rate_limiter import RateLimiter
-from social_media.utils.image_generator import WeatherMapGenerator
-from social_media.utils.map_generator import MapGenerator
+from social_media import SocialMediaManager
+from social_media.utils import RateLimiter, WeatherMapGenerator, MapGenerator
 from config import ConfigurationManager
 
 # Set up logging

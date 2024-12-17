@@ -1,3 +1,4 @@
-from .social_media import SocialMediaManager, PostContent, MediaContent
+from .platforms.base import SocialPlatform
+from .social_media_manager import SocialMediaManager
 
-__all__ = ['SocialMediaManager', 'PostContent', 'MediaContent']
+__all__ = ['SocialPlatform', 'SocialMediaManager']

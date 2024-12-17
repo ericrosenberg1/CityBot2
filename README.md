@@ -6,7 +6,7 @@
 
 <h3 align="center">CityBot2</h3>
 
-CityBot2 is a Python-based app designed to create social media posts for a local area. The initial version features news source RSS feeds and government-sourced data on weather and earthquakes. It supports Bluesky, Facebook, LinkedIn, Reddit, and Twitter/X.
+CityBot2 is a Python-based app designed to create social media posts for a local area. The initial version features news source RSS feeds and government-sourced data on weather and earthquakes. It supports Bluesky, Facebook, LinkedIn, and Twitter/X.
 
 You can download it to your server and schedule it to run with customizations for your city. I'd love your help testing and improving!
 
