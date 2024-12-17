@@ -48,7 +48,7 @@ This is a major upgrade and full rewrite of my original (archived) [CityBot](htt
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Built With
-* [Python][Python]][Python-url]
+* [Python][Python-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -200,15 +200,12 @@ Project Link: [https://github.com/your_username/repo_name](https://github.com/yo
 * [Best-README-Template](https://github.com/othneildrew/Best-README-Template/tree/main) – Major improvemnts to the README.md file
 
 <!-- MARKDOWN LINKS & IMAGES --> https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/othneildrew/Best-README-Template.svg?style=for-the-badge
-[contributors-url]: https://github.com/EricRosenberg1/CityBot2/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/othneildrew/Best-README-Template.svg?style=for-the-badge
-[forks-url]: https://github.com/EricRosenberg1/CityBot2/network/members
-[stars-shield]: https://img.shields.io/github/stars/othneildrew/Best-README-Template.svg?style=for-the-badge
-[stars-url]: https://github.com/EricRosenberg1/citybot2/stargazers
-[issues-shield]: https://img.shields.io/github/issues/othneildrew/Best-README-Template.svg?style=for-the-badge
-[issues-url]: https://github.com/EricRosenberg1/CityBot2/issues
-[license-shield]: https://img.shields.io/github/license/othneildrew/Best-README-Template.svg?style=for-the-badge
-[license-url]: https://github.com/EricRosenberg1/citybot2/LICENSE.txt
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/ericrosenberg
+[contributors-shield]: https://img.shields.io/github/contributors/ericrosenberg1/CityBot2.svg?style=for-the-badge
+[contributors-url]: https://github.com/ericrosenberg1/CityBot2/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/ericrosenberg1/CityBot2.svg?style=for-the-badge
+[forks-url]: https://github.com/ericrosenberg1/CityBot2/network/members
+[stars-shield]: https://img.shields.io/github/stars/ericrosenberg1/CityBot2.svg?style=for-the-badge
+[stars-url]: https://github.com/ericrosenberg1/CityBot2/stargazers
+[issues-shield]: https://img.shields.io/github/issues/ericrosenberg1/CityBot2.svg?style=for-the-badge
+[issues-url]: https://github.com/ericrosenberg1/CityBot2/issues
+[Python-url]: https://www.python.org/
