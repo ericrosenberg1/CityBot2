@@ -61,7 +61,7 @@ class Earthquake(Base):
     magnitude = Column(Float, nullable=True)
     location = Column(String(255), nullable=True)
     depth = Column(Float, nullable=True)
-    timestamp = Column(DateTime, nullable=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=True, index=True)
     distance = Column(Float, nullable=True)
     posted = Column(Boolean, default=False)
     map_path = Column(String(255), nullable=True)
@@ -87,6 +87,7 @@ class NewsArticle(Base):
     source = Column(String(100), nullable=True)
     url = Column(String(512), unique=True, nullable=True)
     published_date = Column(DateTime, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     content_snippet = Column(Text, nullable=True)
     posted = Column(Boolean, default=False)
     relevance_score = Column(Float, nullable=True)
@@ -153,22 +154,29 @@ def cleanup_old_records(session: Session, days: int = 7):
         cutoff = datetime.utcnow() - timedelta(days=days)
         
         # Cleanup WeatherReports
-        session.query(WeatherReport).filter(WeatherReport.timestamp < cutoff).delete()
+        deleted_weather = session.query(WeatherReport).filter(WeatherReport.timestamp < cutoff).delete(synchronize_session=False)
         
         # Cleanup WeatherAlerts
-        session.query(WeatherAlert).filter(WeatherAlert.timestamp < cutoff).delete()
+        deleted_alerts = session.query(WeatherAlert).filter(WeatherAlert.timestamp < cutoff).delete(synchronize_session=False)
         
         # Cleanup Earthquakes
-        session.query(Earthquake).filter(Earthquake.timestamp < cutoff).delete()
+        deleted_earthquakes = session.query(Earthquake).filter(Earthquake.timestamp < cutoff).delete(synchronize_session=False)
         
-        # Cleanup NewsArticles
-        session.query(NewsArticle).filter(NewsArticle.published_date < cutoff).delete()
+        # Cleanup NewsArticles - use either published_date or timestamp
+        deleted_news = session.query(NewsArticle).filter(
+            (NewsArticle.published_date < cutoff) | (NewsArticle.timestamp < cutoff)
+        ).delete(synchronize_session=False)
         
         # Cleanup PostHistory
-        session.query(PostHistory).filter(PostHistory.timestamp < cutoff).delete()
+        deleted_history = session.query(PostHistory).filter(PostHistory.timestamp < cutoff).delete(synchronize_session=False)
         
         session.commit()
-        logger.info(f"Cleaned up records older than {days} days")
+        logger.info(f"Cleaned up records older than {days} days: "
+                    f"Weather Reports: {deleted_weather}, "
+                    f"Weather Alerts: {deleted_alerts}, "
+                    f"Earthquakes: {deleted_earthquakes}, "
+                    f"News Articles: {deleted_news}, "
+                    f"Post History: {deleted_history}")
     except Exception as e:
         session.rollback()
         logger.error(f"Error cleaning up old records: {str(e)}")
@@ -185,6 +193,7 @@ def add_weather_report(session: Session, **kwargs):
         report = WeatherReport(**kwargs)
         session.add(report)
         session.commit()
+        session.refresh(report)
         return report
     except Exception as e:
         session.rollback()
@@ -205,16 +214,16 @@ def record_post(session: Session, platform: str, item_type: str, related_item):
         post_history = PostHistory(
             platform=platform,
             item_type=item_type,
-            weather_report=related_item if isinstance(related_item, WeatherReport) else None,
-            weather_alert=related_item if isinstance(related_item, WeatherAlert) else None,
-            earthquake=related_item if isinstance(related_item, Earthquake) else None,
-            news_article=related_item if isinstance(related_item, NewsArticle) else None
+            weather_report=(related_item if isinstance(related_item, WeatherReport) else None),
+            weather_alert=(related_item if isinstance(related_item, WeatherAlert) else None),
+            earthquake=(related_item if isinstance(related_item, Earthquake) else None),
+            news_article=(related_item if isinstance(related_item, NewsArticle) else None)
         )
         session.add(post_history)
         session.commit()
+        session.refresh(post_history)
         return post_history
     except Exception as e:
         session.rollback()
         logger.error(f"Error recording post history: {str(e)}")
         raise
-

@@ -67,7 +67,7 @@ class CityBot:
             self.running = True
 
         except Exception as e:
-            logger.error(f"Error initializing CityBot: {str(e)}")
+            logger.error(f"Critical error initializing CityBot: {str(e)}", exc_info=True)
             raise
 
     def _initialize_components(self):
@@ -117,7 +117,7 @@ class CityBot:
             )
 
         except Exception as e:
-            logger.error(f"Error initializing components: {str(e)}")
+            logger.error(f"Critical error initializing components: {str(e)}", exc_info=True)
             raise
 
     async def weather_task(self):
@@ -126,16 +126,22 @@ class CityBot:
             try:
                 # Get current conditions
                 conditions = await self.weather_monitor.get_current_conditions()
-                if conditions:
-                    if self.rate_limiter.can_post('weather', 'regular'):
-                        map_path = self.weather_map_generator.generate_weather_map(conditions)
-                        if map_path:
-                            conditions['map_path'] = map_path
-                        
-                        success = await self.social_media.post_weather(conditions)
-                        if success:
-                            self.rate_limiter.record_post('weather', 'regular')
-                            logger.info("Posted weather update successfully")
+                
+                # Add error handling for None conditions
+                if conditions is None:
+                    logger.warning("No weather conditions received. Skipping weather post.")
+                    await asyncio.sleep(self.post_intervals['weather'])
+                    continue
+
+                if self.rate_limiter.can_post('weather', 'regular'):
+                    map_path = self.weather_map_generator.generate_weather_map(conditions)
+                    if map_path:
+                        conditions['map_path'] = map_path
+                    
+                    success = await self.social_media.post_weather(conditions)
+                    if success:
+                        self.rate_limiter.record_post('weather', 'regular')
+                        logger.info("Posted weather update successfully")
 
                 # Check alerts
                 alerts = await self.weather_monitor.get_alerts()
@@ -144,10 +150,10 @@ class CityBot:
                         success = await self.social_media.post_weather_alert(alert)
                         if success:
                             self.rate_limiter.record_post('weather', 'alert')
-                            logger.info(f"Posted weather alert: {alert['event']}")
+                            logger.info(f"Posted weather alert: {alert.get('event', 'Unknown Event')}")
 
             except Exception as e:
-                logger.error(f"Error in weather task: {str(e)}")
+                logger.error(f"Error in weather task: {str(e)}", exc_info=True)
 
             await asyncio.sleep(self.post_intervals['weather'])
 
@@ -168,7 +174,7 @@ class CityBot:
                             logger.info(f"Posted earthquake update: M{quake['magnitude']}")
 
             except Exception as e:
-                logger.error(f"Error in earthquake task: {str(e)}")
+                logger.error(f"Error in earthquake task: {str(e)}", exc_info=True)
 
             await asyncio.sleep(self.post_intervals['earthquake'])
 
@@ -190,7 +196,7 @@ class CityBot:
                             logger.info(f"Posted news article: {article['title']}")
 
             except Exception as e:
-                logger.error(f"Error in news task: {str(e)}")
+                logger.error(f"Error in news task: {str(e)}", exc_info=True)
 
             await asyncio.sleep(self.post_intervals['news'])
 
@@ -198,39 +204,67 @@ class CityBot:
         """Handle system maintenance."""
         while self.running:
             try:
-                self._cleanup()
+                # Explicitly await cleanup methods
+                await self.rate_limiter.cleanup_old_records()
+                self.db.cleanup_old_records()
+                
+                # Clean up old map files
+                cleanup_time = datetime.now() - timedelta(days=7)
+                for directory in ['cache/weather_maps', 'cache/maps']:
+                    if os.path.exists(directory):
+                        for file in os.listdir(directory):
+                            file_path = os.path.join(directory, file)
+                            if datetime.fromtimestamp(os.path.getctime(file_path)) < cleanup_time:
+                                try:
+                                    os.remove(file_path)
+                                except Exception as e:
+                                    logger.warning(f"Could not remove file {file_path}: {str(e)}")
+                
+                logger.info("Maintenance task completed successfully")
             except Exception as e:
-                logger.error(f"Error in maintenance task: {str(e)}")
-            await asyncio.sleep(self.post_intervals['maintenance'])
+                logger.error(f"Error in maintenance task: {str(e)}", exc_info=True)
 
-    def _cleanup(self):
-        """Perform system cleanup."""
-        try:
-            self.db.cleanup_old_records()
-            self.rate_limiter.cleanup_old_records()
-            
-            # Clean up old map files
-            cleanup_time = datetime.now() - timedelta(days=7)
-            for directory in ['cache/weather_maps', 'cache/maps']:
-                if os.path.exists(directory):
-                    for file in os.listdir(directory):
-                        file_path = os.path.join(directory, file)
-                        if datetime.fromtimestamp(os.path.getctime(file_path)) < cleanup_time:
-                            os.remove(file_path)
-            
-            logger.info("Cleanup completed successfully")
-        except Exception as e:
-            logger.error(f"Error during cleanup: {str(e)}")
+            await asyncio.sleep(self.post_intervals['maintenance'])
 
     def _shutdown_handler(self, signum, frame):
         """Handle system shutdown."""
         logger.info("Shutdown signal received. Cleaning up...")
         self.running = False
-        for task in self.tasks:
-            task.cancel()
-        self._cleanup()
-        logger.info("Shutdown complete.")
-        sys.exit(0)
+        
+        # Get the current event loop
+        loop = asyncio.get_event_loop()
+        
+        async def shutdown_tasks():
+            """Perform shutdown tasks asynchronously."""
+            try:
+                # Cancel all tasks
+                for task in self.tasks:
+                    if not task.done():
+                        task.cancel()
+                
+                # Wait for tasks to be canceled
+                await asyncio.gather(*self.tasks, return_exceptions=True)
+                
+                # Close database and social media connections
+                self.db.close()
+                await self.social_media.close()
+                
+                logger.info("All tasks and connections closed successfully")
+            except Exception as e:
+                logger.error(f"Error during shutdown tasks: {str(e)}", exc_info=True)
+        
+        try:
+            # If we're already in an event loop, schedule the shutdown
+            if loop.is_running():
+                loop.create_task(shutdown_tasks())
+            else:
+                # If not in an event loop, run the shutdown synchronously
+                loop.run_until_complete(shutdown_tasks())
+        except Exception as e:
+            logger.error(f"Error in shutdown handler: {str(e)}", exc_info=True)
+        finally:
+            logger.info("Shutdown complete.")
+            sys.exit(0)
 
     async def run(self):
         """Run the main bot loop."""
@@ -253,10 +287,8 @@ class CityBot:
         except asyncio.CancelledError:
             logger.info("Bot tasks cancelled")
         except Exception as e:
-            logger.error(f"Error running bot: {str(e)}")
+            logger.error(f"Critical error running bot: {str(e)}", exc_info=True)
             raise
-        finally:
-            self._cleanup()
 
 def main():
     """Main entry point for the application."""
@@ -271,7 +303,7 @@ def main():
     except KeyboardInterrupt:
         logger.info("Application stopped by user")
     except Exception as e:
-        logger.error(f"Application error: {str(e)}")
+        logger.error(f"Critical application error: {str(e)}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
