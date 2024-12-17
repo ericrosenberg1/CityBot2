@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import sqlite3
 from typing import Dict, Optional
-import json
+import os
+from dotenv import load_dotenv
 
 logger = logging.getLogger('CityBot2.rate_limiter')
 
@@ -18,6 +19,7 @@ class RateLimit:
 class RateLimiter:
     def __init__(self, db_path: str = "data/rate_limits.db"):
         self.db_path = db_path
+        load_dotenv('credentials.env')
         self.initialize_db()
         self.load_limits()
 
@@ -38,21 +40,20 @@ class RateLimiter:
             ''')
 
     def load_limits(self):
-        """Load rate limits from configuration."""
+        """Load rate limits from environment variables."""
         try:
-            with open('config/social_config.json') as f:
-                config = json.load(f)
-            
             self.limits = {}
-            for platform, settings in config['platforms'].items():
-                rate_limits = settings.get('rate_limits', {})
-                for post_type in settings.get('post_types', []):
+            platforms = os.getenv('PLATFORMS', 'twitter').split(',')
+            
+            for platform in platforms:
+                post_types = os.getenv(f'{platform.upper()}_POST_TYPES', 'tweet').split(',')
+                for post_type in post_types:
                     self.limits[f"{platform}_{post_type}"] = RateLimit(
                         platform=platform,
                         post_type=post_type,
-                        posts_per_hour=rate_limits.get('posts_per_hour', 10),
-                        posts_per_day=rate_limits.get('posts_per_day', 24),
-                        minimum_interval=rate_limits.get('minimum_interval', 300)
+                        posts_per_hour=int(os.getenv(f'{platform.upper()}_POSTS_PER_HOUR', 10)),
+                        posts_per_day=int(os.getenv(f'{platform.upper()}_POSTS_PER_DAY', 24)),
+                        minimum_interval=int(os.getenv(f'{platform.upper()}_MINIMUM_INTERVAL', 300))
                     )
         except Exception as e:
             logger.error(f"Error loading rate limits: {str(e)}")

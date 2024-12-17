@@ -100,9 +100,9 @@ nano credentials.env
 
 Press CTRL+X and enter Y at the prompt to save and exit.
 
-Then update your social_config file with details for your city. Remove the example settings from Ventura, California.
+Then update your social_config file with details for your city. Remove the example settings from Ventura, California and rename it for your city.
    ```sh
-nano config/social_config.json
+nano config/city_example.json
   ```
 Press CTRL+X and enter Y at the prompt to save and exit.
 

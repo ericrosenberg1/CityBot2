@@ -35,7 +35,6 @@ logs/
 data/
 cache/
 config/credentials.env
-config/social_config.json
 backups/
 
 # Temporary files

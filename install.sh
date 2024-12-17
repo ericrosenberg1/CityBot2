@@ -31,7 +31,6 @@ mkdir -p {logs,data,cache/weather_maps,cache/maps,config}
 
 # Copy configuration files
 cp config/credentials.env.example config/credentials.env
-cp config/social_config.json.example config/social_config.json
 
 # Set up service
 sudo cp citybot.service /etc/systemd/system/
@@ -41,7 +40,6 @@ echo "Installation complete. Please follow these steps:"
 echo ""
 echo "1. Edit configuration files:"
 echo "   nano config/credentials.env"
-echo "   nano config/social_config.json"
 echo ""
 echo "2. Start the service:"
 echo "   sudo systemctl start citybot"

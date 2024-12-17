@@ -20,7 +20,13 @@ class SocialMediaManager:
         self.rate_limiter = RateLimiter()
         self.content_validator = ContentValidator()
         self.initialize_platforms()
-        self.hashtags = city_config['social']['hashtags']
+    
+    # Default hashtags with city name
+    self.hashtags = {
+        'weather': [f"{city_config['name']}Weather", f"{city_config['name']}CA", "CaWeather"],
+        'earthquake': ["Earthquake", f"{city_config['name']}CA", "CaliforniaEarthquake"],
+        'news': [city_config['name'], f"{city_config['name']}CA", "LocalNews"]
+    }
 
     def initialize_platforms(self):
         """Initialize all enabled social media platforms."""

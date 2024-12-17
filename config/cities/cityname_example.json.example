@@ -64,5 +64,12 @@
                 "moorpark"
             ]
         }
+    },
+    "social": {
+        "hashtags": {
+            "weather": ["VenturaWeather", "CaWeather", "VenturaCA"],
+            "earthquake": ["Earthquake", "VenturaCA", "CaliforniaEarthquake"],
+            "news": ["Ventura", "VenturaCA", "VenturaNews"]
+        }
     }
 }
