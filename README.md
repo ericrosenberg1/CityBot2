@@ -173,6 +173,7 @@ For support, open an issue here on GitHub. For inquiries about commercial suppor
 ### Contributors:
 
 <a href="https://github.com/ericrosenberg1/CityBot2/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ericrosenberg1/CityBot2" />
 </a>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
