@@ -6,12 +6,22 @@
 
 <h3 align="center">CityBot2</h3>
 
+CityBot2 is a Python-based app designed to create social media posts for a local area. The initial version features news source RSS feeds and government-sourced data on weather and earthquakes. It supports Bluesky, Facebook, LinkedIn, Reddit, and Twitter/X.
+
+You can download it to your server and schedule it to run with customizations for your city. I'd love your help testing and improving!
+
+This is a major upgrade and full rewrite of my original (archived) [CityBot](https://github.com/ericrosenberg1/CityBot).
+
+[![Snyk](https://snyk.io/test/github/ericrosenberg1/CityBot2/badge.svg)](https://snyk.io/test/github/ericrosenberg1/CityBot2)
+[![Maintainability](https://api.codeclimate.com/v1/badges/4857f450946330748975/maintainability)](https://codeclimate.com/github/ericrosenberg1/CityBot2/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/4857f450946330748975/test_coverage)](https://codeclimate.com/github/ericrosenberg1/CityBot2/test_coverage)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/efb5beefe547465087883828710a7a11)](https://app.codacy.com/gh/ericrosenberg1/CityBot2/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+
 <!-- TABLE OF CONTENTS -->
 <details>
   <summary>Table of Contents</summary>
   <ol>
     <li>
-      <a href="#about-the-project">About The Project</a>
       <ul>
         <li><a href="#built-with">Built With</a></li>
       </ul>
@@ -32,20 +42,6 @@
     <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
 </details>
-
-## About The Project
-CityBot2 is a Python-based app designed to create social media posts for a local area. The initial version features news source RSS feeds and government-sourced data on weather and earthquakes. It supports Bluesky, Facebook, LinkedIn, Reddit, and Twitter/X.
-
-You can download it to your server and schedule it to run with customizations for your city. I'd love your help testing and improving!
-
-This is a major upgrade and full rewrite of my original (archived) [CityBot](https://github.com/ericrosenberg1/CityBot).
-
-[![Snyk](https://snyk.io/test/github/ericrosenberg1/CityBot2/badge.svg)](https://snyk.io/test/github/ericrosenberg1/CityBot2)
-[![Maintainability](https://api.codeclimate.com/v1/badges/4857f450946330748975/maintainability)](https://codeclimate.com/github/ericrosenberg1/CityBot2/maintainability)
-[![Test Coverage](https://api.codeclimate.com/v1/badges/4857f450946330748975/test_coverage)](https://codeclimate.com/github/ericrosenberg1/CityBot2/test_coverage)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/efb5beefe547465087883828710a7a11)](https://app.codacy.com/gh/ericrosenberg1/CityBot2/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Built With
 * [Python][Python-url]
