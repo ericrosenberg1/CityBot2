@@ -1,40 +1,86 @@
 {
     "name": "Ventura",
     "state": "CA",
+    "description": "City of San Buenaventura, California",
+    "timezone": "America/Los_Angeles",
+    
     "coordinates": {
         "latitude": 34.2805,
-        "longitude": -119.2945
+        "longitude": -119.2945,
+        "elevation": 36,
+        "bounds": {
+            "north": 34.3205,
+            "south": 34.2405,
+            "east": -119.2545,
+            "west": -119.3345
+        }
     },
+
     "weather": {
         "radar_station": "VBX",
         "zone_code": "CAZ039",
-        "description": "Ventura County Coast"
+        "description": "Ventura County Coast",
+        "settings": {
+            "radar_zoom": 8,
+            "update_frequency": 21600,
+            "alert_frequency": 900,
+            "alert_radius_miles": 50
+        }
     },
+
+    "earthquake": {
+        "settings": {
+            "minimum_magnitude": 3.0,
+            "radius_miles": 100,
+            "update_frequency": 300,
+            "significant_thresholds": {
+                "nearby": {
+                    "distance_miles": 25,
+                    "magnitude": 3.0
+                },
+                "regional": {
+                    "distance_miles": 50,
+                    "magnitude": 4.0
+                },
+                "major": {
+                    "distance_miles": 100,
+                    "magnitude": 5.0
+                }
+            }
+        }
+    },
+
     "news": {
         "rss_feeds": {
             "Ventura County Star": {
                 "url": "https://www.vcstar.com/rss",
-                "priority": 1
+                "priority": 1,
+                "update_frequency": 1800
             },
             "KEYT News": {
                 "url": "https://keyt.com/feed",
-                "priority": 1
+                "priority": 1,
+                "update_frequency": 1800
             },
             "Ventura County Reporter": {
                 "url": "https://vcreporter.com/feed",
-                "priority": 1
+                "priority": 1,
+                "update_frequency": 3600
             },
             "KVTA News": {
                 "url": "https://www.kvta.com/news/rss",
-                "priority": 1
+                "priority": 1,
+                "update_frequency": 1800
             },
             "LA Times": {
                 "url": "https://www.latimes.com/california/rss2.0.xml",
-                "priority": 2
+                "priority": 2,
+                "update_frequency": 3600
             },
             "EdHat Santa Barbara": {
                 "url": "https://www.edhat.com/rss.xml",
-                "priority": 2
+                "priority": 2,
+                "update_frequency": 3600
             }
         },
         "location_keywords": {
@@ -50,7 +96,14 @@
                 "pacific view mall",
                 "community memorial hospital",
                 "ventura county fairgrounds",
-                "surfers point"
+                "surfers point",
+                "ventura beach",
+                "seaward avenue",
+                "ventura avenue",
+                "victoria avenue",
+                "telegraph road",
+                "main street ventura",
+                "ventura marina"
             ],
             "exclude": [
                 "port hueneme",
@@ -63,6 +116,64 @@
                 "simi valley",
                 "moorpark"
             ]
+        },
+        "settings": {
+            "relevance_threshold": 0.7,
+            "max_posts_per_day": 24,
+            "update_frequency": 1800
         }
+    },
+
+    "social": {
+        "post_settings": {
+            "weather": {
+                "frequency": 21600,
+                "max_daily": 4,
+                "include_map": true,
+                "alert_override": true
+            },
+            "earthquake": {
+                "frequency": 300,
+                "max_daily": 24,
+                "include_map": true,
+                "alert_override": true
+            },
+            "news": {
+                "frequency": 1800,
+                "max_daily": 24,
+                "include_map": true,
+                "alert_override": false
+            }
+        },
+        "hashtags": {
+            "weather": [
+                "VenturaWeather",
+                "CaWeather",
+                "VenturaCA",
+                "VenturaCoast",
+                "SoCal"
+            ],
+            "earthquake": [
+                "Earthquake",
+                "VenturaCA",
+                "CaliforniaEarthquake",
+                "SoCalQuake"
+            ],
+            "news": [
+                "Ventura",
+                "VenturaCA",
+                "VenturaNews",
+                "LocalNews",
+                "805News"
+            ]
+        }
+    },
+
+    "map_settings": {
+        "default_zoom": 11,
+        "weather_zoom": 8,
+        "earthquake_zoom": 9,
+        "news_zoom": 12,
+        "map_style": "default"
     }
 }
