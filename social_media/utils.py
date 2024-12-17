@@ -9,9 +9,6 @@ from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from urllib.parse import urlparse
 from PIL import Image
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
 import folium
 import requests
 from io import BytesIO
@@ -57,6 +54,7 @@ class RateLimiter:
                     timestamp DATETIME NOT NULL
                 )
             ''')
+            conn.execute('DROP INDEX IF EXISTS idx_platform_type_timestamp')
             conn.execute('''
                 CREATE INDEX IF NOT EXISTS idx_platform_type_timestamp 
                 ON post_history(platform, post_type, timestamp)
@@ -218,15 +216,19 @@ class ContentValidator:
         
         if media.image_path:
             try:
+                if not isinstance(media.image_path, (str, bytes, os.PathLike)):
+                    errors.append(f"Invalid image path type: {type(media.image_path)}")
+                    return errors
+                
                 if not os.path.exists(media.image_path):
                     errors.append(f"Image file not found: {media.image_path}")
                     return errors
-                    
+                
                 platform_reqs = self.image_requirements.get(platform)
                 if not platform_reqs:
                     errors.append(f"No image requirements defined for platform: {platform}")
                     return errors
-                    
+                
                 with Image.open(media.image_path) as img:
                     file_size = os.path.getsize(media.image_path)
                     if file_size > platform_reqs['max_size']:
@@ -249,13 +251,13 @@ class ContentValidator:
                             f"Image dimensions ({width}x{height}) exceed maximum "
                             f"allowed {max_w}x{max_h}"
                         )
-                        
+                    
                     if img.format not in platform_reqs['allowed_formats']:
                         errors.append(
                             f"Image format {img.format} not supported. Allowed: "
                             f"{', '.join(platform_reqs['allowed_formats'])}"
                         )
-                        
+                    
             except Exception as e:
                 errors.append(f"Error validating image {media.image_path}: {str(e)}")
                 logger.exception("Image validation error")
@@ -276,88 +278,6 @@ class ContentValidator:
             return all([result.scheme, result.netloc]) and result.scheme in ['http', 'https']
         except Exception:
             return False
-
-class WeatherMapGenerator:
-    """Generates weather maps."""
-    
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.cache_dir = Path("cache/weather_maps")
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-    async def generate_weather_map(self, weather_data: Dict[str, Any]) -> Optional[str]:
-        """Generate weather map with current conditions."""
-        try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-            output_path = self.cache_dir / f"weather_map_{timestamp}.png"
-
-            # Run matplotlib operations in a thread pool
-            return await asyncio.to_thread(self._create_weather_map,
-                                         weather_data,
-                                         str(output_path))
-
-        except Exception as e:
-            logger.error(f"Error generating weather map: {str(e)}")
-            return None
-
-    def _create_weather_map(self, weather_data: Dict[str, Any], output_path: str) -> str:
-        """Create the weather map (runs in thread pool)."""
-        fig = plt.figure(figsize=(12, 8))
-        try:
-            ax = plt.axes(projection=ccrs.PlateCarree())
-
-            # Set map extent
-            center_lat = self.config['coordinates']['latitude']
-            center_lon = self.config['coordinates']['longitude']
-            ax.set_extent([
-                center_lon - 1.5,
-                center_lon + 1.5,
-                center_lat - 1.5,
-                center_lat + 1.5
-            ])
-
-            # Add map features
-            ax.add_feature(cfeature.COASTLINE)
-            ax.add_feature(cfeature.STATES)
-            ax.add_feature(cfeature.LAND, facecolor='lightgray')
-            ax.add_feature(cfeature.OCEAN, facecolor='lightblue')
-
-            # Add weather info
-            plt.title(f"Weather Conditions for {self.config.get('city', 'City')}")
-            info_text = (
-                f"Temperature: {weather_data['temperature']}°F\n"
-                f"Wind: {weather_data['wind_speed']}mph {weather_data['wind_direction']}\n"
-                f"Cloud Cover: {weather_data['cloud_cover']}%"
-            )
-            plt.text(0.02, 0.98, info_text, transform=ax.transAxes, 
-                    bbox=dict(facecolor='white', alpha=0.7),
-                    verticalalignment='top')
-
-            plt.savefig(output_path, dpi=300, bbox_inches='tight')
-            return output_path
-            
-        except Exception as e:
-            logger.error(f"Error creating weather map: {str(e)}")
-            raise
-        finally:
-            plt.close(fig)
-
-    async def cleanup_old_maps(self, days: int = 7) -> None:
-        """Clean up old weather map files."""
-        try:
-            cutoff = datetime.now() - timedelta(days=days)
-            await asyncio.to_thread(self._cleanup_files, cutoff)
-        except Exception as e:
-            logger.error(f"Error cleaning up weather maps: {str(e)}")
-
-    def _cleanup_files(self, cutoff: datetime) -> None:
-        """Clean up old files (runs in thread pool)."""
-        for file_path in self.cache_dir.glob('*.png'):
-            try:
-                if datetime.fromtimestamp(file_path.stat().st_mtime) < cutoff:
-                    file_path.unlink()
-            except Exception as e:
-                logger.error(f"Error deleting file {file_path}: {str(e)}")
 
 class MapGenerator:
     """Generates various maps."""
@@ -427,7 +347,7 @@ class MapGenerator:
 
         except Exception as e:
             logger.error(f"Error creating earthquake map: {str(e)}")
-            if os.path.exists(html_path):
+            if 'html_path' in locals() and os.path.exists(html_path):
                 os.unlink(html_path)
             raise
 
@@ -449,6 +369,8 @@ class MapGenerator:
         except Exception as e:
             logger.error(f"Error generating news map: {str(e)}")
             return None
+
+    # Continuing from the _create_news_map method:
 
     def _create_news_map(self, location_data: Dict[str, Any]) -> str:
         """Create news map (runs in thread pool)."""
@@ -490,7 +412,7 @@ class MapGenerator:
 
         except Exception as e:
             logger.error(f"Error creating news map: {str(e)}")
-            if os.path.exists(html_path):
+            if 'html_path' in locals() and os.path.exists(html_path):
                 os.unlink(html_path)
             raise
 

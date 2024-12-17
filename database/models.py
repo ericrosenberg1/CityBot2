@@ -108,6 +108,7 @@ class PostHistory(Base):
     platform = Column(String(50), nullable=False, index=True)
     item_type = Column(String(50), nullable=False, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    content_preview = Column(String(100), nullable=True)  # Added this column
     
     # Foreign keys to related items
     weather_report_id = Column(Integer, ForeignKey('weather_reports.id'), nullable=True)
@@ -131,8 +132,10 @@ def create_database(database_url: str):
     """
     Create database engine and session factory.
     
-    :param database_url: SQLAlchemy database connection URL
-    :return: Tuple of (engine, SessionLocal)
+    Args:
+        database_url: SQLAlchemy database connection URL
+    Returns:
+        Tuple of (engine, SessionLocal)
     """
     try:
         engine = create_engine(database_url, echo=False)
@@ -147,73 +150,67 @@ def cleanup_old_records(session: Session, days: int = 7):
     """
     Clean up old records across different tables.
     
-    :param session: SQLAlchemy session
-    :param days: Number of days to keep records
+    Args:
+        session: SQLAlchemy session
+        days: Number of days to keep records
     """
     try:
         cutoff = datetime.utcnow() - timedelta(days=days)
         
         # Cleanup WeatherReports
-        deleted_weather = session.query(WeatherReport).filter(WeatherReport.timestamp < cutoff).delete(synchronize_session=False)
+        deleted_weather = session.query(WeatherReport).filter(
+            WeatherReport.timestamp < cutoff
+        ).delete(synchronize_session=False)
         
         # Cleanup WeatherAlerts
-        deleted_alerts = session.query(WeatherAlert).filter(WeatherAlert.timestamp < cutoff).delete(synchronize_session=False)
+        deleted_alerts = session.query(WeatherAlert).filter(
+            WeatherAlert.timestamp < cutoff
+        ).delete(synchronize_session=False)
         
         # Cleanup Earthquakes
-        deleted_earthquakes = session.query(Earthquake).filter(Earthquake.timestamp < cutoff).delete(synchronize_session=False)
+        deleted_earthquakes = session.query(Earthquake).filter(
+            Earthquake.timestamp < cutoff
+        ).delete(synchronize_session=False)
         
-        # Cleanup NewsArticles - use either published_date or timestamp
+        # Cleanup NewsArticles
         deleted_news = session.query(NewsArticle).filter(
             (NewsArticle.published_date < cutoff) | (NewsArticle.timestamp < cutoff)
         ).delete(synchronize_session=False)
         
         # Cleanup PostHistory
-        deleted_history = session.query(PostHistory).filter(PostHistory.timestamp < cutoff).delete(synchronize_session=False)
+        deleted_history = session.query(PostHistory).filter(
+            PostHistory.timestamp < cutoff
+        ).delete(synchronize_session=False)
         
         session.commit()
         logger.info(f"Cleaned up records older than {days} days: "
-                    f"Weather Reports: {deleted_weather}, "
-                    f"Weather Alerts: {deleted_alerts}, "
-                    f"Earthquakes: {deleted_earthquakes}, "
-                    f"News Articles: {deleted_news}, "
-                    f"Post History: {deleted_history}")
+                   f"Weather Reports: {deleted_weather}, "
+                   f"Weather Alerts: {deleted_alerts}, "
+                   f"Earthquakes: {deleted_earthquakes}, "
+                   f"News Articles: {deleted_news}, "
+                   f"Post History: {deleted_history}")
     except Exception as e:
         session.rollback()
         logger.error(f"Error cleaning up old records: {str(e)}")
 
-def add_weather_report(session: Session, **kwargs):
-    """
-    Add a new weather report to the database.
-    
-    :param session: SQLAlchemy session
-    :param kwargs: Keyword arguments for WeatherReport
-    :return: Added WeatherReport instance
-    """
-    try:
-        report = WeatherReport(**kwargs)
-        session.add(report)
-        session.commit()
-        session.refresh(report)
-        return report
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error adding weather report: {str(e)}")
-        raise
-
-def record_post(session: Session, platform: str, item_type: str, related_item):
+def record_post(session: Session, platform: str, item_type: str, content_preview: str, related_item):
     """
     Record a social media post in the database.
     
-    :param session: SQLAlchemy session
-    :param platform: Social media platform name
-    :param item_type: Type of item being posted
-    :param related_item: Related database model instance
-    :return: Added PostHistory instance
+    Args:
+        session: SQLAlchemy session
+        platform: Social media platform name
+        item_type: Type of item being posted
+        content_preview: Preview of the post content
+        related_item: Related database model instance
+    Returns:
+        Added PostHistory instance
     """
     try:
         post_history = PostHistory(
             platform=platform,
             item_type=item_type,
+            content_preview=content_preview[:100] if content_preview else None,
             weather_report=(related_item if isinstance(related_item, WeatherReport) else None),
             weather_alert=(related_item if isinstance(related_item, WeatherAlert) else None),
             earthquake=(related_item if isinstance(related_item, Earthquake) else None),
