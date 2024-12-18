@@ -44,7 +44,7 @@ This is a major upgrade and full rewrite of my original (archived) [CityBot](htt
 </details>
 
 ### Built With
-* <img src="https://img.shields.io/badge/Python-FFD43B?style=for-the-badge&logo=python&logoColor=blue" />
+<img src="https://img.shields.io/badge/Python-FFD43B?style=for-the-badge&logo=python&logoColor=blue" />
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -75,16 +75,7 @@ Example:
 git clone https://github.com/ericrosenberg1/CityBot2
   ```
 
-2. Run the installer
-To install, set permissions for the install.sh file and run it with these commands:
-
-Example:
-   ```sh
-chmod +x install.sh
-./install.sh
-  ```
-
-4. Edit configuration files:
+2. Edit configuration files:
 Navigate to the config directory. Using the Nano editor, add your social network credentials.
 
 Enter these commands in your terminal:
@@ -102,16 +93,12 @@ nano config/city_example.json
   ```
 Press CTRL+X and enter Y at the prompt to save and exit.
 
-4. Start the service:
-   - `sudo systemctl start citybot`
+3. Run the app using the following Python command:
+   ```sh
+python main.py
+  ```
 
-5. Enable service at boot:
-   - `sudo systemctl enable citybot`
-
-6. Check service status:
-   - `sudo systemctl status citybot`
-
-7. View logs:
+4. View logs:
    - `tail -f logs/citybot.log`
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
