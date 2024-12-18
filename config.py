@@ -1,10 +1,13 @@
-from typing import Dict, Any, Optional, Union, Type
+"""Configuration management module for CityBot2."""
+
 import os
 import json
-from pathlib import Path
 import logging
-from dotenv import load_dotenv
+from pathlib import Path
+from typing import Dict, Optional, List
 from dataclasses import dataclass
+
+from dotenv import load_dotenv
 
 logger = logging.getLogger('CityBot2.config')
 
@@ -13,12 +16,13 @@ class SocialNetworkConfig:
     """Configuration for a social network."""
     enabled: bool
     credentials: Dict[str, str]
-    post_types: list[str]
+    post_types: List[str]
     rate_limits: Dict[str, int]
+
 
 class ConfigurationManager:
     """Manages all application configuration."""
-    
+
     DEFAULT_CONFIG = {
         "weather": {
             "update_interval": 21600,  # 6 hours
@@ -80,7 +84,7 @@ class ConfigurationManager:
         if not config_path.exists():
             raise FileNotFoundError(f"City configuration not found: {config_path}")
 
-        with open(config_path) as f:
+        with open(config_path, encoding='utf-8') as f:
             config = json.load(f)
             self._validate_city_config(config)
             return self._merge_with_defaults(config)
@@ -88,17 +92,16 @@ class ConfigurationManager:
     def _merge_with_defaults(self, config: Dict) -> Dict:
         """Merge city-specific config with default values."""
         merged = config.copy()
-        
-        # Add default hashtags
+
         if 'social' not in merged:
             merged['social'] = {'hashtags': {}}
-            
+
         for category in ['weather', 'earthquake', 'news']:
             merged['social']['hashtags'][category] = (
-                [f"{merged['name']}{category.capitalize()}", f"{merged['name']}{merged['state']}"] +
-                self.DEFAULT_CONFIG[category]['default_hashtags']
+                [f"{merged['name']}{category.capitalize()}", f"{merged['name']}{merged['state']}"]
+                + self.DEFAULT_CONFIG[category]['default_hashtags']
             )
-        
+
         return merged
 
     def _validate_city_config(self, config: Dict) -> None:
@@ -132,28 +135,22 @@ class ConfigurationManager:
         for key, expected_type in structure.items():
             if key not in data:
                 raise ValueError(f"Missing required field: {path}{key}")
-                
+
             if isinstance(expected_type, dict):
                 if not isinstance(data[key], dict):
                     raise ValueError(f"Invalid type for {path}{key}: expected dict")
                 self._validate_structure(data[key], expected_type, f"{path}{key}.")
             else:
-                if isinstance(expected_type, tuple):
-                    valid_types = expected_type
-                else:
-                    valid_types = (expected_type,)
-                    
+                valid_types = expected_type if isinstance(expected_type, tuple) else (expected_type,)
                 if not isinstance(data[key], valid_types):
                     raise ValueError(
-                        f"Invalid type for {path}{key}: expected {valid_types}, "
-                        f"got {type(data[key])}"
+                        f"Invalid type for {path}{key}: expected {valid_types}, got {type(data[key])}"
                     )
 
     def _initialize_social_networks(self) -> Dict[str, SocialNetworkConfig]:
         """Initialize configuration for each social network."""
         networks = {}
-        
-        # Define social network configurations
+
         network_configs = {
             'twitter': {
                 'required_vars': [
@@ -211,25 +208,31 @@ class ConfigurationManager:
             }
         }
 
-        # Initialize each configured network
         for network, config in network_configs.items():
             if all(os.getenv(var) for var in config['required_vars']):
                 credentials = {
                     cred_key: os.getenv(env_var)
                     for cred_key, env_var in config['credentials_map'].items()
                 }
-                
+
+                # Get rate limits as strings and convert to int if available, else use defaults
+                posts_per_hour_str = os.getenv(f'{network.upper()}_POSTS_PER_HOUR')
+                posts_per_hour = int(posts_per_hour_str) if posts_per_hour_str else self.DEFAULT_CONFIG['rate_limits']['default']['posts_per_hour']
+
+                posts_per_day_str = os.getenv(f'{network.upper()}_POSTS_PER_DAY')
+                posts_per_day = int(posts_per_day_str) if posts_per_day_str else self.DEFAULT_CONFIG['rate_limits']['default']['posts_per_day']
+
+                minimum_interval_str = os.getenv(f'{network.upper()}_MINIMUM_INTERVAL')
+                minimum_interval = int(minimum_interval_str) if minimum_interval_str else self.DEFAULT_CONFIG['rate_limits']['default']['minimum_interval']
+
                 networks[network] = SocialNetworkConfig(
                     enabled=True,
                     credentials=credentials,
                     post_types=['weather', 'earthquake', 'news'],
                     rate_limits={
-                        'posts_per_hour': int(os.getenv(f'{network.upper()}_POSTS_PER_HOUR', 
-                            self.DEFAULT_CONFIG['rate_limits']['default']['posts_per_hour'])),
-                        'posts_per_day': int(os.getenv(f'{network.upper()}_POSTS_PER_DAY',
-                            self.DEFAULT_CONFIG['rate_limits']['default']['posts_per_day'])),
-                        'minimum_interval': int(os.getenv(f'{network.upper()}_MINIMUM_INTERVAL',
-                            self.DEFAULT_CONFIG['rate_limits']['default']['minimum_interval']))
+                        'posts_per_hour': posts_per_hour,
+                        'posts_per_day': posts_per_day,
+                        'minimum_interval': minimum_interval
                     }
                 )
 
@@ -237,7 +240,6 @@ class ConfigurationManager:
 
     def _validate_all_configs(self) -> None:
         """Validate all configurations are consistent."""
-        # Validate social network configurations
         for network, config in self.social_networks.items():
             if not all(config.credentials.values()):
                 raise ValueError(f"Invalid credentials for {network}")
@@ -246,7 +248,7 @@ class ConfigurationManager:
         """Get configuration for a specific social network."""
         return self.social_networks.get(network)
 
-    def get_enabled_networks(self) -> list[str]:
+    def get_enabled_networks(self) -> List[str]:
         """Get list of enabled social networks."""
         return [name for name, config in self.social_networks.items() if config.enabled]
 
@@ -256,21 +258,22 @@ class ConfigurationManager:
 
     def get_interval(self, task_type: str) -> int:
         """Get update interval for a specific task type."""
-        return int(os.getenv(
-            f'{task_type.upper()}_UPDATE_INTERVAL',
-            self.DEFAULT_CONFIG.get(task_type, {}).get('update_interval', 3600)
-        ))
+        interval_str = os.getenv(
+            f'{task_type.upper()}_UPDATE_INTERVAL'
+        )
+        if interval_str is not None and interval_str.isdigit():
+            return int(interval_str)
+        return self.DEFAULT_CONFIG.get(task_type, {}).get('update_interval', 3600)
 
-# For backwards compatibility
+
 def get_default_config() -> Dict:
     """Get default configuration (for backwards compatibility)."""
     return ConfigurationManager.DEFAULT_CONFIG
 
+
 def load_city_config(city_name: str = None) -> Dict:
     """Load city configuration (for backwards compatibility)."""
-    if city_name is None:
-        return ConfigurationManager().city_config
-    
+    if city_name is not None:
+        os.environ['CITY_NAME'] = city_name
     config_manager = ConfigurationManager()
-    os.environ['CITY_NAME'] = city_name
-    return config_manager._load_city_config()
+    return config_manager.city_config
