@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, TYPE_CHECKING, Union
 from dataclasses import dataclass, field
 import asyncio
 from datetime import datetime
@@ -9,7 +9,9 @@ from .platforms.bluesky import BlueSkyPlatform
 from .platforms.facebook import FacebookPlatform
 from .platforms.linkedin import LinkedInPlatform
 from .utils import RateLimiter, ContentValidator, PostContent
-from .formatters import PostFormatter
+
+if TYPE_CHECKING:
+    from monitors.weather import WeatherData, WeatherAlert
 
 logger = logging.getLogger('CityBot2.social.manager')
 
@@ -34,21 +36,15 @@ class PostResult:
 
 class SocialMediaManager:
     """Manages posting to multiple social media platforms."""
-
+    
     def __init__(self, config: Dict[str, Any], city_config: Dict[str, Any]):
-        """Initialize the social media manager.
-        
-        Args:
-            config: Dictionary containing platform configurations
-            city_config: Dictionary containing city-specific settings
-        """
+        """Initialize the social media manager."""
         self._validate_config(config, city_config)
         self.config = config
         self.city_config = city_config
         self.platforms: Dict[str, SocialPlatform] = {}
         self.rate_limiter = RateLimiter(config=config.get('rate_limits'))
         self.content_validator = ContentValidator()
-        self.post_formatter = PostFormatter(city_config)
         self.platform_retries: Dict[str, int] = {}
         self.max_retries = config.get('max_retries', 3)
         self.retry_delay = config.get('retry_delay', 60)
@@ -56,15 +52,7 @@ class SocialMediaManager:
         self.initialize_platforms()
 
     def _validate_config(self, config: Dict[str, Any], city_config: Dict[str, Any]) -> None:
-        """Validate configuration dictionaries.
-        
-        Args:
-            config: Platform configuration dictionary
-            city_config: City configuration dictionary
-        
-        Raises:
-            ValueError: If required configuration fields are missing
-        """
+        """Validate configuration dictionaries."""
         if 'platforms' not in config:
             raise ValueError("Configuration must include 'platforms' section")
             
@@ -74,6 +62,7 @@ class SocialMediaManager:
             raise ValueError(f"Missing required city configuration fields: {', '.join(missing_fields)}")
 
     def initialize_platforms(self) -> None:
+        """Initialize all configured social media platforms."""
         platform_classes = {
             'bluesky': BlueSkyPlatform,
             'twitter': TwitterPlatform,
@@ -88,7 +77,6 @@ class SocialMediaManager:
 
             try:
                 if self._validate_platform_config(platform_name, platform_config):
-                    # Pass both platform_config and city_config
                     self.platforms[platform_name] = platform_class(platform_config, self.city_config)
                     self.platform_retries[platform_name] = 0
                     logger.info(f"Initialized {platform_name} platform")
@@ -96,15 +84,7 @@ class SocialMediaManager:
                 logger.error(f"Failed to initialize {platform_name}: {str(e)}")
 
     async def post_content(self, content: PostContent, post_type: str) -> Dict[str, PostResult]:
-        """Post content to all enabled and appropriate platforms.
-        
-        Args:
-            content: The content to post
-            post_type: Type of post (e.g., 'weather', 'news', etc.)
-        
-        Returns:
-            Dictionary mapping platform names to PostResult objects
-        """
+        """Post content to all enabled and appropriate platforms."""
         results: Dict[str, PostResult] = {}
         tasks = []
 
@@ -217,11 +197,7 @@ class SocialMediaManager:
         return True
 
     async def _can_post_to_platform(self, platform_name: str, post_type: str) -> Tuple[bool, Optional[str]]:
-        """Check if posting is allowed for the platform and type.
-        
-        Returns:
-            Tuple of (can_post: bool, reason: Optional[str])
-        """
+        """Check if posting is allowed for the platform and type."""
         platform_config = self.config['platforms'].get(platform_name, {})
         
         if not platform_config.get('enabled', False):
@@ -238,24 +214,36 @@ class SocialMediaManager:
 
         return True, None
 
-    async def post_weather(self, weather_data: Dict[str, Any]) -> Dict[str, PostResult]:
+    async def post_weather(self, weather_data: 'WeatherData') -> Dict[str, 'PostResult']:
         """Post weather update to appropriate platforms."""
-        content = self.post_formatter.format_weather(weather_data)
+        hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('weather', [])
+        content = weather_data.format_for_social(hashtags)
         return await self.post_content(content, 'weather')
 
-    async def post_weather_alert(self, alert_data: Dict[str, Any]) -> Dict[str, PostResult]:
+    async def post_weather_alert(self, alert: 'WeatherAlert') -> Dict[str, 'PostResult']:
         """Post weather alert to appropriate platforms."""
-        content = self.post_formatter.format_weather_alert(alert_data)
+        hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('weather', [])
+        content = alert.format_for_social(hashtags)
         return await self.post_content(content, 'weather')
 
-    async def post_earthquake(self, quake_data: Dict[str, Any]) -> Dict[str, PostResult]:
+    async def post_earthquake(self, quake_data: Dict[str, Any]) -> Dict[str, 'PostResult']:
         """Post earthquake update to appropriate platforms."""
-        content = self.post_formatter.format_earthquake(quake_data)
+        hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('earthquake', [])
+        try:
+            content = quake_data.format_for_social(hashtags)
+        except AttributeError:
+            # Handle dictionary format for backward compatibility
+            return await self.post_content(quake_data, 'earthquake')
         return await self.post_content(content, 'earthquake')
 
-    async def post_news(self, article_data: Dict[str, Any]) -> Dict[str, PostResult]:
+    async def post_news(self, article: Any) -> Dict[str, 'PostResult']:
         """Post news update to appropriate platforms."""
-        content = self.post_formatter.format_news(article_data)
+        hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('news', [])
+        try:
+            content = article.format_for_social(hashtags)
+        except AttributeError:
+            # Handle dictionary format for backward compatibility
+            return await self.post_content(article, 'news')
         return await self.post_content(content, 'news')
 
     async def close(self) -> None:

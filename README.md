@@ -44,7 +44,7 @@ This is a major upgrade and full rewrite of my original (archived) [CityBot](htt
 </details>
 
 ### Built With
-* [Python][Python-url]
+* <img src="https://img.shields.io/badge/Python-FFD43B?style=for-the-badge&logo=python&logoColor=blue" />
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

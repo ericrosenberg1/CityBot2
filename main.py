@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 from database.operations import DatabaseManager
-from monitors.weather import WeatherMonitor
+from monitors.weather import WeatherMonitor, WeatherData, WeatherAlert
 from monitors.earthquake import EarthquakeMonitor
 from monitors.news import NewsMonitor
 from social_media import SocialMediaManager
@@ -124,15 +124,15 @@ class CityBot:
         while self.running:
             try:
                 # Get current conditions with map already included
-                conditions = await self.weather_monitor.get_current_conditions()
-                if conditions is None:
+                weather_data = await self.weather_monitor.get_current_conditions()
+                if weather_data is None:
                     logger.warning("No weather conditions received. Skipping weather post.")
                     await asyncio.sleep(self.post_intervals['weather'])
                     continue
 
                 if await self.rate_limiter.can_post('weather', 'regular'):
-                    success = await self.social_media.post_weather(conditions)
-                    if success:
+                    results = await self.social_media.post_weather(weather_data)
+                    if any(result.success for result in results.values()):
                         await self.rate_limiter.record_post('weather', 'regular')
                         logger.info("Posted weather update successfully")
                     else:
@@ -142,12 +142,12 @@ class CityBot:
                 alerts = await self.weather_monitor.get_alerts()
                 for alert in alerts:
                     if await self.rate_limiter.can_post('weather', 'alert'):
-                        success = await self.social_media.post_weather_alert(alert)
-                        if success:
+                        results = await self.social_media.post_weather_alert(alert)
+                        if any(result.success for result in results.values()):
                             await self.rate_limiter.record_post('weather', 'alert')
-                            logger.info(f"Posted weather alert: {alert.get('event', 'Unknown Event')}")
+                            logger.info(f"Posted weather alert: {alert.event}")
                         else:
-                            logger.error(f"Failed to post weather alert: {alert.get('event', 'Unknown Event')}")
+                            logger.error(f"Failed to post weather alert: {alert.event}")
 
             except Exception as e:
                 logger.error(f"Error in weather task: {str(e)}", exc_info=True)
@@ -166,8 +166,8 @@ class CityBot:
                         if map_path:
                             quake['map_path'] = str(map_path)  # Ensure path is string
                         
-                        success = await self.social_media.post_earthquake(quake)
-                        if success:
+                        results = await self.social_media.post_earthquake(quake)
+                        if any(result.success for result in results.values()):
                             await self.rate_limiter.record_post('earthquake', 'alert')
                             logger.info(f"Posted earthquake update: M{quake.get('magnitude', 'Unknown')}")
                         else:
@@ -185,18 +185,12 @@ class CityBot:
                 articles = await self.news_monitor.check_news()
                 for article in articles:
                     if await self.rate_limiter.can_post('news', 'regular'):
-                        if 'location_data' in article:
-                            # Generate news map if location data available
-                            map_path = await self.map_generator.generate_news_map(article['location_data'])
-                            if map_path:
-                                article['map_path'] = str(map_path)  # Ensure path is string
-                        
-                        success = await self.social_media.post_news(article)
-                        if success:
+                        results = await self.social_media.post_news(article)
+                        if any(result.success for result in results.values()):
                             await self.rate_limiter.record_post('news', 'regular')
-                            logger.info(f"Posted news article: {article.get('title', 'Unknown Title')}")
+                            logger.info(f"Posted news article: {article.title}")
                         else:
-                            logger.error(f"Failed to post news article: {article.get('title', 'Unknown Title')}")
+                            logger.error(f"Failed to post news article: {article.title}")
 
             except Exception as e:
                 logger.error(f"Error in news task: {str(e)}", exc_info=True)
@@ -252,7 +246,7 @@ class CityBot:
                 # Close database and social media connections
                 await self.db.close()
                 await self.social_media.close()
-                await self.weather_monitor.cleanup()  # Add cleanup for weather monitor
+                await self.weather_monitor.cleanup()
                 
                 logger.info("All tasks and connections closed successfully")
             except Exception as e:

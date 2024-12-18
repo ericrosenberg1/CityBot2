@@ -370,8 +370,6 @@ class MapGenerator:
             logger.error(f"Error generating news map: {str(e)}")
             return None
 
-    # Continuing from the _create_news_map method:
-
     def _create_news_map(self, location_data: Dict[str, Any]) -> str:
         """Create news map (runs in thread pool)."""
         m = folium.Map(
