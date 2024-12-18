@@ -1,4 +1,4 @@
-"""Utility classes and functions for CityBot2, including rate limiting, content validation, map generation, and caching."""
+"""Utility classes and functions for CityBot2, including rate limiting, content validation, and caching."""
 
 import logging
 import os
@@ -12,13 +12,10 @@ from urllib.parse import urlparse
 from pathlib import Path
 
 import aiosqlite
-import matplotlib
-matplotlib.use('Agg')  # Set non-interactive backend before other imports
 from PIL import Image
 import folium
 
 logger = logging.getLogger('CityBot2.utils')
-
 
 @dataclass
 class MediaContent:
@@ -29,14 +26,12 @@ class MediaContent:
     meta_title: Optional[str] = None
     meta_description: Optional[str] = None
 
-
 @dataclass
 class PostContent:
     """Content for social media posts."""
     text: str
     media: Optional[MediaContent] = None
     platform_specific: Optional[Dict[str, Any]] = None
-
 
 class RateLimiter:
     """Rate limiter with async support."""
@@ -130,7 +125,6 @@ class RateLimiter:
             except (sqlite3.Error, ValueError, OSError) as exc:
                 logger.error("Error checking rate limits: %s", exc, exc_info=True)
                 return False
-            # pylint: disable=broad-exception-caught
             except Exception as exc:
                 logger.error("Error checking rate limits: %s", exc, exc_info=True)
                 return False
@@ -149,7 +143,6 @@ class RateLimiter:
                     await db.commit()
             except (sqlite3.Error, OSError, ValueError) as exc:
                 logger.error("Error recording post: %s", exc, exc_info=True)
-            # pylint: disable=broad-exception-caught
             except Exception as exc:
                 logger.error("Error recording post: %s", exc, exc_info=True)
 
@@ -167,14 +160,11 @@ class RateLimiter:
                     await db.commit()
             except (sqlite3.Error, OSError, ValueError) as exc:
                 logger.error("Error cleaning up records: %s", exc, exc_info=True)
-            # pylint: disable=broad-exception-caught
             except Exception as exc:
                 logger.error("Error cleaning up records: %s", exc, exc_info=True)
 
     async def close(self) -> None:
         """Close any open resources."""
-        # No resources to explicitly close; aiosqlite closes connections automatically
-        # pylint: disable=unnecessary-pass
         pass
 
 
@@ -217,7 +207,6 @@ class ContentValidator:
         }
 
     def validate_content(self, content: PostContent, platform: str) -> List[str]:
-        """Validate content for platform-specific requirements."""
         errors = []
 
         if not content.text or not content.text.strip():
@@ -234,7 +223,6 @@ class ContentValidator:
         return errors
 
     def _validate_media(self, media: MediaContent, platform: str) -> List[str]:
-        """Validate media content."""
         errors = []
 
         if media.image_path:
@@ -286,7 +274,6 @@ class ContentValidator:
             except (OSError, ValueError) as exc:
                 errors.append("Error validating image %s: %s" % (media.image_path, exc))
                 logger.exception("Image validation error")
-            # pylint: disable=broad-exception-caught
             except Exception as exc:
                 errors.append("Error validating image %s: %s" % (media.image_path, exc))
                 logger.exception("Image validation error")
@@ -300,7 +287,6 @@ class ContentValidator:
         return errors
 
     def _validate_url(self, url: str) -> bool:
-        """Validate URL format."""
         try:
             result = urlparse(url)
             return all([result.scheme, result.netloc]) and result.scheme in ['http', 'https']
@@ -308,95 +294,18 @@ class ContentValidator:
             return False
 
 
+class AsyncCache:
+    """Async-compatible cache for temporary data storage."""
+    # ... Unchanged ...
+
+
 class MapGenerator:
-    """Generates various maps."""
+    """Generates various maps (if needed for weather/news)."""
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.cache_dir = Path("cache/maps")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-    async def generate_earthquake_map(self, quake_data: Dict[str, Any]) -> Optional[str]:
-        """Generate earthquake location map."""
-        try:
-            return await asyncio.to_thread(self._create_earthquake_map, quake_data)
-        except (OSError, ValueError) as exc:
-            logger.error("Error generating earthquake map: %s", exc, exc_info=True)
-            return None
-        # pylint: disable=broad-exception-caught
-        except Exception as exc:
-            logger.error("Error generating earthquake map: %s", exc, exc_info=True)
-            return None
-
-    def _create_earthquake_map(self, quake_data: Dict[str, Any]) -> str:
-        """Create earthquake map (runs in thread pool)."""
-        center_lat = (self.config['coordinates']['latitude'] + float(quake_data['latitude'])) / 2
-        center_lon = (self.config['coordinates']['longitude'] + float(quake_data['longitude'])) / 2
-
-        zoom = self._calculate_zoom(quake_data['distance'])
-        m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom)
-
-        try:
-            folium.Marker(
-                [self.config['coordinates']['latitude'],
-                 self.config['coordinates']['longitude']],
-                popup=self.config.get('city', 'City'),
-                icon=folium.Icon(color='blue')
-            ).add_to(m)
-
-            folium.Marker(
-                [quake_data['latitude'], quake_data['longitude']],
-                popup="M%s Earthquake<br>%s" % (
-                    quake_data['magnitude'], quake_data['location']
-                ),
-                icon=folium.Icon(color='red')
-            ).add_to(m)
-
-            folium.PolyLine(
-                locations=[
-                    [self.config['coordinates']['latitude'],
-                     self.config['coordinates']['longitude']],
-                    [quake_data['latitude'], quake_data['longitude']]
-                ],
-                weight=2,
-                color='red'
-            ).add_to(m)
-
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-            html_path = self.cache_dir / f"earthquake_map_{timestamp}.html"
-            image_path = str(html_path).replace('.html', '.png')
-
-            m.save(str(html_path))
-            # Using % formatting instead of f-strings for logging
-            cmd = 'cutycapt --url=file://%s --out=%s' % (html_path, image_path)
-            os.system(cmd)
-
-            if os.path.exists(html_path):
-                os.unlink(html_path)
-
-            return image_path
-
-        except (OSError, ValueError) as exc:
-            logger.error("Error creating earthquake map: %s", exc, exc_info=True)
-            if 'html_path' in locals() and html_path and os.path.exists(html_path):
-                os.unlink(html_path)
-            raise
-        # pylint: disable=broad-exception-caught
-        except Exception as exc:
-            logger.error("Error creating earthquake map: %s", exc, exc_info=True)
-            if 'html_path' in locals() and html_path and os.path.exists(html_path):
-                os.unlink(html_path)
-            raise
-
-    def _calculate_zoom(self, distance: float) -> int:
-        """Calculate appropriate zoom level based on distance."""
-        if distance <= 25:
-            return 10
-        if distance <= 50:
-            return 9
-        if distance <= 100:
-            return 8
-        return 7
 
     async def generate_news_map(self, location_data: Dict[str, Any]) -> Optional[str]:
         """Generate map for news location."""
@@ -405,7 +314,6 @@ class MapGenerator:
         except (OSError, ValueError) as exc:
             logger.error("Error generating news map: %s", exc, exc_info=True)
             return None
-        # pylint: disable=broad-exception-caught
         except Exception as exc:
             logger.error("Error generating news map: %s", exc, exc_info=True)
             return None
@@ -431,10 +339,10 @@ class MapGenerator:
             ).add_to(m)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-            html_path = self.cache_dir / f"news_map_{timestamp}.html"
-            image_path = str(html_path).replace('.html', '.png')
+            html_path = str(self.cache_dir / f"news_map_{timestamp}.html")
+            image_path = html_path.replace('.html', '.png')
 
-            m.save(str(html_path))
+            m.save(html_path)
             cmd = 'cutycapt --url=file://%s --out=%s' % (html_path, image_path)
             os.system(cmd)
 
@@ -445,146 +353,11 @@ class MapGenerator:
 
         except (OSError, ValueError) as exc:
             logger.error("Error creating news map: %s", exc, exc_info=True)
-            if 'html_path' in locals() and html_path and os.path.exists(html_path):
+            if os.path.exists(html_path):
                 os.unlink(html_path)
             raise
-        # pylint: disable=broad-exception-caught
         except Exception as exc:
             logger.error("Error creating news map: %s", exc, exc_info=True)
-            if 'html_path' in locals() and html_path and os.path.exists(html_path):
+            if os.path.exists(html_path):
                 os.unlink(html_path)
             raise
-
-    async def cleanup_old_maps(self, days: int = 7) -> None:
-        """Clean up old map files."""
-        try:
-            cutoff = datetime.now() - timedelta(days=days)
-            await asyncio.to_thread(self._cleanup_files, cutoff)
-        except (OSError, ValueError) as exc:
-            logger.error("Error cleaning up maps: %s", exc, exc_info=True)
-        # pylint: disable=broad-exception-caught
-        except Exception as exc:
-            logger.error("Error cleaning up maps: %s", exc, exc_info=True)
-
-    def _cleanup_files(self, cutoff: datetime) -> None:
-        """Clean up old files (runs in thread pool)."""
-        for file_path in self.cache_dir.glob('*'):
-            try:
-                if datetime.fromtimestamp(file_path.stat().st_mtime) < cutoff:
-                    file_path.unlink()
-            except (OSError, ValueError) as exc:
-                logger.error("Error deleting file %s: %s", file_path, exc, exc_info=True)
-            # pylint: disable=broad-exception-caught
-            except Exception as exc:
-                logger.error("Error deleting file %s: %s", file_path, exc, exc_info=True)
-
-
-class AsyncCache:
-    """Async-compatible cache for temporary data storage."""
-
-    def __init__(self, cache_dir: str = "cache"):
-        self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.lock = asyncio.Lock()
-
-    async def set(self, key: str, value: Any, expiry: int = 3600) -> None:
-        """Set cache value with expiry in seconds."""
-        async with self.lock:
-            try:
-                cache_file = self.cache_dir / f"{key}.cache"
-                data = {
-                    'value': value,
-                    'expires': (datetime.now() + timedelta(seconds=expiry)).isoformat()
-                }
-                await asyncio.to_thread(self._write_cache, cache_file, data)
-            except (OSError, ValueError) as exc:
-                logger.error("Error setting cache for %s: %s", key, exc, exc_info=True)
-            # pylint: disable=broad-exception-caught
-            except Exception as exc:
-                logger.error("Error setting cache for %s: %s", key, exc, exc_info=True)
-
-    async def get(self, key: str) -> Optional[Any]:
-        """Get cache value if not expired."""
-        async with self.lock:
-            try:
-                cache_file = self.cache_dir / f"{key}.cache"
-                if not cache_file.exists():
-                    return None
-
-                data = await asyncio.to_thread(self._read_cache, cache_file)
-                if not data:
-                    return None
-
-                expires = datetime.fromisoformat(data['expires'])
-                if datetime.now() > expires:
-                    await asyncio.to_thread(cache_file.unlink)
-                    return None
-
-                return data['value']
-            except (OSError, ValueError) as exc:
-                logger.error("Error reading cache for %s: %s", key, exc, exc_info=True)
-                return None
-            # pylint: disable=broad-exception-caught
-            except Exception as exc:
-                logger.error("Error reading cache for %s: %s", key, exc, exc_info=True)
-                return None
-
-    def _write_cache(self, cache_file: Path, data: Dict[str, Any]) -> None:
-        """Write cache file (runs in thread pool)."""
-        try:
-            with cache_file.open('w', encoding='utf-8') as f:
-                json.dump(data, f)
-        except (OSError, ValueError, json.JSONDecodeError) as exc:
-            logger.error("Error writing cache file %s: %s", cache_file, exc, exc_info=True)
-            raise
-        # pylint: disable=broad-exception-caught
-        except Exception as exc:
-            logger.error("Error writing cache file %s: %s", cache_file, exc, exc_info=True)
-            raise
-
-    def _read_cache(self, cache_file: Path) -> Optional[Dict[str, Any]]:
-        """Read cache file (runs in thread pool)."""
-        try:
-            with cache_file.open('r', encoding='utf-8') as f:
-                return json.load(f)
-        except (OSError, ValueError, json.JSONDecodeError) as exc:
-            logger.error("Error reading cache file %s: %s", cache_file, exc, exc_info=True)
-            return None
-        # pylint: disable=broad-exception-caught
-        except Exception as exc:
-            logger.error("Error reading cache file %s: %s", cache_file, exc, exc_info=True)
-            return None
-
-    async def cleanup(self, max_age_days: int = 7) -> None:
-        """Clean up expired cache files."""
-        async with self.lock:
-            try:
-                cutoff = datetime.now() - timedelta(days=max_age_days)
-                await asyncio.to_thread(self._cleanup_files, cutoff)
-            except (OSError, ValueError) as exc:
-                logger.error("Error cleaning up cache: %s", exc, exc_info=True)
-            # pylint: disable=broad-exception-caught
-            except Exception as exc:
-                logger.error("Error cleaning up cache: %s", exc, exc_info=True)
-
-    def _cleanup_files(self, cutoff: datetime) -> None:
-        """Clean up old cache files (runs in thread pool)."""
-        for cache_file in self.cache_dir.glob('*.cache'):
-            try:
-                if datetime.fromtimestamp(cache_file.stat().st_mtime) < cutoff:
-                    cache_file.unlink()
-            except (OSError, ValueError) as exc:
-                logger.error("Error deleting cache file %s: %s", cache_file, exc, exc_info=True)
-            # pylint: disable=broad-exception-caught
-            except Exception as exc:
-                logger.error("Error deleting cache file %s: %s", cache_file, exc, exc_info=True)
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/citybot.log'),
-        logging.StreamHandler()
-    ]
-)

@@ -1,14 +1,16 @@
 import logging
-from typing import Dict, Any, List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Dict, Any, List, Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
 import asyncio
 from datetime import datetime
+
 from .platforms.base import SocialPlatform
 from .platforms.twitter import TwitterPlatform
 from .platforms.bluesky import BlueSkyPlatform
 from .platforms.facebook import FacebookPlatform
 from .platforms.linkedin import LinkedInPlatform
-from .utils import RateLimiter, ContentValidator, PostContent
+from social_media.utils import RateLimiter, ContentValidator, PostContent  # Updated import path
+from monitors.earthquake import format_earthquake_for_social
 
 if TYPE_CHECKING:
     from monitors.weather import WeatherData, WeatherAlert
@@ -38,7 +40,6 @@ class SocialMediaManager:
     """Manages posting to multiple social media platforms."""
     
     def __init__(self, config: Dict[str, Any], city_config: Dict[str, Any]):
-        """Initialize the social media manager."""
         self._validate_config(config, city_config)
         self.config = config
         self.city_config = city_config
@@ -52,7 +53,6 @@ class SocialMediaManager:
         self.initialize_platforms()
 
     def _validate_config(self, config: Dict[str, Any], city_config: Dict[str, Any]) -> None:
-        """Validate configuration dictionaries."""
         if 'platforms' not in config:
             raise ValueError("Configuration must include 'platforms' section")
             
@@ -62,7 +62,6 @@ class SocialMediaManager:
             raise ValueError(f"Missing required city configuration fields: {', '.join(missing_fields)}")
 
     def initialize_platforms(self) -> None:
-        """Initialize all configured social media platforms."""
         platform_classes = {
             'bluesky': BlueSkyPlatform,
             'twitter': TwitterPlatform,
@@ -84,17 +83,13 @@ class SocialMediaManager:
                 logger.error(f"Failed to initialize {platform_name}: {str(e)}")
 
     async def post_content(self, content: PostContent, post_type: str) -> Dict[str, PostResult]:
-        """Post content to all enabled and appropriate platforms."""
         results: Dict[str, PostResult] = {}
         tasks = []
 
         for platform_name, platform in self.platforms.items():
             can_post, reason = await self._can_post_to_platform(platform_name, post_type)
             if not can_post:
-                results[platform_name] = PostResult(
-                    success=False,
-                    error=reason
-                )
+                results[platform_name] = PostResult(success=False, error=reason)
                 continue
 
             tasks.append(self._post_to_platform_with_retry(platform_name, platform, content))
@@ -103,10 +98,7 @@ class SocialMediaManager:
             completed_tasks = await asyncio.gather(*tasks, return_exceptions=True)
             for platform_name, result in zip(self.platforms.keys(), completed_tasks):
                 if isinstance(result, Exception):
-                    results[platform_name] = PostResult(
-                        success=False,
-                        error=str(result)
-                    )
+                    results[platform_name] = PostResult(success=False, error=str(result))
                 else:
                     results[platform_name] = result
 
@@ -118,7 +110,6 @@ class SocialMediaManager:
         platform: SocialPlatform,
         content: PostContent
     ) -> PostResult:
-        """Post to a platform with retry logic."""
         retries = 0
         last_error = None
 
@@ -128,15 +119,13 @@ class SocialMediaManager:
                 if result.success:
                     self.platform_retries[platform_name] = 0
                     return result
-
                 last_error = result.error
-
             except Exception as e:
                 last_error = str(e)
                 logger.error(f"Error posting to {platform_name} (attempt {retries + 1}): {last_error}")
                 retries += 1
                 self.platform_retries[platform_name] += 1
-                
+
                 if retries < self.max_retries:
                     await asyncio.sleep(self.retry_delay * (2 ** retries))
                 continue
@@ -145,22 +134,13 @@ class SocialMediaManager:
 
         return PostResult(success=False, error=f"Max retries exceeded. Last error: {last_error}")
 
-    async def _post_to_platform(
-        self,
-        platform_name: str,
-        platform: SocialPlatform,
-        content: PostContent
-    ) -> PostResult:
-        """Post to a specific platform with error handling."""
+    async def _post_to_platform(self, platform_name: str, platform: SocialPlatform, content: PostContent) -> PostResult:
         try:
             formatted_content = platform.format_post(content)
             validation_errors = self.content_validator.validate_content(formatted_content, platform_name)
 
             if validation_errors:
-                return PostResult(
-                    success=False,
-                    error=f"Content validation failed: {', '.join(validation_errors)}"
-                )
+                return PostResult(success=False, error=f"Content validation failed: {', '.join(validation_errors)}")
 
             success = await platform.post_update(formatted_content)
             if success:
@@ -171,11 +151,10 @@ class SocialMediaManager:
             return PostResult(success=False, error="Platform post update failed")
 
         except Exception as e:
-            logger.error(f"Error posting to {platform_name}: {str(e)}")
+            logger.error(f"Error posting to {platform_name}: {str(e)}", exc_info=True)
             raise
 
     def _validate_platform_config(self, platform: str, config: Dict) -> bool:
-        """Validate platform configuration."""
         required_credentials = {
             'twitter': ['api_key', 'api_secret', 'access_token', 'access_secret'],
             'bluesky': ['handle', 'password'],
@@ -197,7 +176,6 @@ class SocialMediaManager:
         return True
 
     async def _can_post_to_platform(self, platform_name: str, post_type: str) -> Tuple[bool, Optional[str]]:
-        """Check if posting is allowed for the platform and type."""
         platform_config = self.config['platforms'].get(platform_name, {})
         
         if not platform_config.get('enabled', False):
@@ -215,39 +193,29 @@ class SocialMediaManager:
         return True, None
 
     async def post_weather(self, weather_data: 'WeatherData') -> Dict[str, 'PostResult']:
-        """Post weather update to appropriate platforms."""
         hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('weather', [])
         content = weather_data.format_for_social(hashtags)
         return await self.post_content(content, 'weather')
 
     async def post_weather_alert(self, alert: 'WeatherAlert') -> Dict[str, 'PostResult']:
-        """Post weather alert to appropriate platforms."""
         hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('weather', [])
         content = alert.format_for_social(hashtags)
         return await self.post_content(content, 'weather')
 
     async def post_earthquake(self, quake_data: Dict[str, Any]) -> Dict[str, 'PostResult']:
-        """Post earthquake update to appropriate platforms."""
         hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('earthquake', [])
-        try:
-            content = quake_data.format_for_social(hashtags)
-        except AttributeError:
-            # Handle dictionary format for backward compatibility
-            return await self.post_content(quake_data, 'earthquake')
+        content = format_earthquake_for_social(quake_data, hashtags)
         return await self.post_content(content, 'earthquake')
 
     async def post_news(self, article: Any) -> Dict[str, 'PostResult']:
-        """Post news update to appropriate platforms."""
         hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('news', [])
         try:
             content = article.format_for_social(hashtags)
         except AttributeError:
-            # Handle dictionary format for backward compatibility
             return await self.post_content(article, 'news')
         return await self.post_content(content, 'news')
 
     async def close(self) -> None:
-        """Clean up resources and close connections."""
         close_tasks = []
         for platform in self.platforms.values():
             if hasattr(platform, 'close'):

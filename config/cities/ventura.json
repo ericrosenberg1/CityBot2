@@ -84,8 +84,9 @@
             }
         },
         "location_keywords": {
-            "must_include": ["ventura"],
+            "must_include": [],
             "at_least_one": [
+                "ventura",
                 "downtown ventura",
                 "ventura harbor",
                 "ventura pier",
@@ -118,7 +119,7 @@
             ]
         },
         "settings": {
-            "relevance_threshold": 0.7,
+            "relevance_threshold": 0.3,
             "max_posts_per_day": 24,
             "update_frequency": 1800
         }
