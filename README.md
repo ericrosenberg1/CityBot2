@@ -120,15 +120,6 @@ CityBot2 may require system dependencies for mapping and geospatial support. On 
 - python3-cartopy
 - cutycapt
 
-Install them with:
-```sh
-sudo apt-get update
-sudo apt-get install -y \
-    python3-pip python3-dev build-essential libatlas-base-dev gfortran \
-    libgeos-dev libproj-dev proj-data proj-bin libcairo2-dev pkg-config \
-    python3-cartopy cutycapt
-```
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Usage
