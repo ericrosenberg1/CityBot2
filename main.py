@@ -1,4 +1,5 @@
 import asyncio
+import asyncio.exceptions
 import logging
 import signal
 import sys
@@ -31,13 +32,17 @@ class CityBot:
 
     def __init__(self):
         """Initialize CityBot with configuration and components."""
+        self.running = False
+        self.tasks = []
+        self.shutdown_event = asyncio.Event()
+        
         try:
             self.config_manager = ConfigurationManager()
             self.city_config = self.config_manager.city_config
             self.enabled_networks = self.config_manager.get_enabled_networks()
 
             logger.info("Initialized CityBot for %s, %s",
-                        self.city_config['name'], self.city_config['state'])
+                       self.city_config['name'], self.city_config['state'])
             enabled_networks_str = ", ".join(self.enabled_networks)
             logger.info("Enabled social networks: %s", enabled_networks_str)
 
@@ -55,11 +60,10 @@ class CityBot:
             }
 
             self._initialize_components()
-
-            signal.signal(signal.SIGINT, self._shutdown_handler)
-            signal.signal(signal.SIGTERM, self._shutdown_handler)
-            self.tasks = []
-            self.running = True
+            
+            # Initialize signal handlers
+            signal.signal(signal.SIGINT, self._signal_handler)
+            signal.signal(signal.SIGTERM, self._signal_handler)
 
         except Exception as e:
             logger.error("Critical error initializing CityBot: %s", e, exc_info=True)
@@ -109,6 +113,75 @@ class CityBot:
             logger.error("Critical error initializing components: %s", e, exc_info=True)
             raise
 
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals."""
+        logger.info(f"Received signal {signum}")
+        if self.running:
+            asyncio.create_task(self.shutdown())
+
+    async def run(self):
+        """Main run loop for the bot."""
+        try:
+            self.running = True
+            logger.info("Starting CityBot tasks...")
+            
+            # Create all tasks
+            self.tasks = [
+                asyncio.create_task(self.weather_task()),
+                asyncio.create_task(self.earthquake_task()),
+                asyncio.create_task(self.news_task()),
+                asyncio.create_task(self.maintenance_task())
+            ]
+            
+            # Wait for shutdown signal
+            await self.shutdown_event.wait()
+            
+            # Wait for all tasks to complete
+            if self.tasks:
+                await asyncio.gather(*self.tasks, return_exceptions=True)
+                
+        except Exception as e:
+            logger.error("Error in main run loop: %s", e, exc_info=True)
+            raise
+        finally:
+            await self.cleanup()
+
+    async def shutdown(self):
+        """Handle graceful shutdown."""
+        if not self.running:
+            return
+            
+        logger.info("Initiating shutdown...")
+        self.running = False
+        
+        # Cancel all tasks
+        for task in self.tasks:
+            if not task.done():
+                task.cancel()
+        
+        # Signal shutdown
+        self.shutdown_event.set()
+
+    async def cleanup(self):
+        """Clean up resources during shutdown."""
+        logger.info("Cleaning up resources...")
+        try:
+            # Close social media connections
+            await self.social_media.close()
+            
+            # Close weather monitor
+            await self.weather_monitor.cleanup()
+            
+            # Close rate limiter
+            await self.rate_limiter.close()
+            
+            # Close database connection
+            self.db.close()
+            
+            logger.info("Cleanup completed successfully")
+        except Exception as e:
+            logger.error("Error during cleanup: %s", e, exc_info=True)
+
     async def weather_task(self):
         """Handle weather monitoring and posting."""
         try:
@@ -138,13 +211,14 @@ class CityBot:
                             else:
                                 logger.error("Failed to post weather alert: %s", alert.event)
 
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
                     logger.error("Error in weather task: %s", e, exc_info=True)
 
                 await asyncio.sleep(self.post_intervals['weather'])
         except asyncio.CancelledError:
             logger.info("Weather task canceled cleanly.")
-            return
 
     async def earthquake_task(self):
         """Handle earthquake monitoring and posting."""
@@ -166,13 +240,14 @@ class CityBot:
                                 magnitude = quake.get('magnitude', 'Unknown')
                                 logger.error("Failed to post earthquake update: M%s", magnitude)
 
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
                     logger.error("Error in earthquake task: %s", e, exc_info=True)
 
                 await asyncio.sleep(self.post_intervals['earthquake'])
         except asyncio.CancelledError:
             logger.info("Earthquake task canceled cleanly.")
-            return
 
     async def news_task(self):
         """Handle news monitoring and posting."""
@@ -189,13 +264,14 @@ class CityBot:
                             else:
                                 logger.error("Failed to post news article: %s", article.title)
 
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
                     logger.error("Error in news task: %s", e, exc_info=True)
 
                 await asyncio.sleep(self.post_intervals['news'])
         except asyncio.CancelledError:
             logger.info("News task canceled cleanly.")
-            return
 
     async def maintenance_task(self):
         """Handle system maintenance."""
@@ -217,80 +293,44 @@ class CityBot:
                                     logger.warning("Could not remove file %s: %s", file_path, e)
 
                     logger.info("Maintenance task completed successfully")
+                except asyncio.CancelledError:
+                    raise
                 except Exception as e:
                     logger.error("Error in maintenance task: %s", e, exc_info=True)
 
                 await asyncio.sleep(self.post_intervals['maintenance'])
         except asyncio.CancelledError:
             logger.info("Maintenance task canceled cleanly.")
-            return
 
-    def _shutdown_handler(self, _signum, _frame):
-        """Handle system shutdown."""
-        logger.info("Shutdown signal received. Cleaning up...")
-        self.running = False
 
-        loop = asyncio.get_event_loop()
+async def async_main():
+    """Async entry point for the application."""
+    for directory in ['logs', 'data', 'cache/weather_maps', 'cache/maps']:
+        os.makedirs(directory, exist_ok=True)
 
-        async def shutdown_tasks():
-            try:
-                for task in self.tasks:
-                    if not task.done():
-                        task.cancel()
-
-                await asyncio.gather(*self.tasks, return_exceptions=True)
-
-                await self.db.close()
-                await self.social_media.close()
-                await self.weather_monitor.cleanup()
-
-                logger.info("All tasks and connections closed successfully")
-            except Exception as e:
-                logger.error("Error during shutdown tasks: %s", e, exc_info=True)
-
-            # Instead of sys.exit, we just stop the loop
-            loop.stop()
-
-        if loop.is_running():
-            loop.create_task(shutdown_tasks())
-        else:
-            loop.run_until_complete(shutdown_tasks())
-
-    async def run(self):
-        """Run the main bot loop."""
-        logger.info("Starting CityBot for %s...", self.city_config['name'])
-        try:
-            await self.weather_monitor.initialize()
-
-            self.tasks = [
-                asyncio.create_task(self.weather_task()),
-                asyncio.create_task(self.earthquake_task()),
-                asyncio.create_task(self.news_task()),
-                asyncio.create_task(self.maintenance_task())
-            ]
-
-            await asyncio.gather(*self.tasks)
-
-        except asyncio.CancelledError:
-            logger.info("Bot tasks cancelled")
-        except Exception as e:
-            logger.error("Critical error running bot: %s", e, exc_info=True)
-            raise
+    bot = None
+    try:
+        bot = CityBot()
+        await bot.run()
+    except Exception as e:
+        logger.error("Critical application error: %s", e, exc_info=True)
+        if bot:
+            await bot.shutdown()
+    finally:
+        if bot:
+            await bot.cleanup()
 
 
 def main():
     """Main entry point for the application."""
-    for directory in ['logs', 'data', 'cache/weather_maps', 'cache/maps']:
-        os.makedirs(directory, exist_ok=True)
-
     try:
-        bot = CityBot()
-        asyncio.run(bot.run())
+        asyncio.run(async_main())
     except KeyboardInterrupt:
         logger.info("Application stopped by user")
     except Exception as e:
-        logger.error("Critical application error: %s", e, exc_info=True)
-        sys.exit(1)
+        logger.error("Fatal error: %s", e, exc_info=True)
+    finally:
+        sys.exit(0)
 
 
 if __name__ == "__main__":

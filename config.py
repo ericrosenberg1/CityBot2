@@ -160,24 +160,24 @@ class ConfigurationManager:
                     'TWITTER_ACCESS_SECRET'
                 ],
                 'credentials_map': {
-                    'api_key': 'TWITTER_API_KEY',
-                    'api_secret': 'TWITTER_API_SECRET',
-                    'access_token': 'TWITTER_ACCESS_TOKEN',
-                    'access_secret': 'TWITTER_ACCESS_SECRET'
+                    'TWITTER_API_KEY': 'api_key',
+                    'TWITTER_API_SECRET': 'api_secret',
+                    'TWITTER_ACCESS_TOKEN': 'access_token',
+                    'TWITTER_ACCESS_SECRET': 'access_secret'
                 }
             },
             'bluesky': {
                 'required_vars': ['BLUESKY_HANDLE', 'BLUESKY_PASSWORD'],
                 'credentials_map': {
-                    'handle': 'BLUESKY_HANDLE',
-                    'password': 'BLUESKY_PASSWORD'
+                    'BLUESKY_HANDLE': 'handle',
+                    'BLUESKY_PASSWORD': 'password'
                 }
             },
             'facebook': {
                 'required_vars': ['FACEBOOK_PAGE_ID', 'FACEBOOK_ACCESS_TOKEN'],
                 'credentials_map': {
-                    'page_id': 'FACEBOOK_PAGE_ID',
-                    'access_token': 'FACEBOOK_ACCESS_TOKEN'
+                    'FACEBOOK_PAGE_ID': 'page_id',
+                    'FACEBOOK_ACCESS_TOKEN': 'access_token'
                 }
             },
             'linkedin': {
@@ -187,54 +187,54 @@ class ConfigurationManager:
                     'LINKEDIN_ACCESS_TOKEN'
                 ],
                 'credentials_map': {
-                    'client_id': 'LINKEDIN_CLIENT_ID',
-                    'client_secret': 'LINKEDIN_CLIENT_SECRET',
-                    'access_token': 'LINKEDIN_ACCESS_TOKEN'
-                }
-            },
-            'reddit': {
-                'required_vars': [
-                    'REDDIT_CLIENT_ID',
-                    'REDDIT_CLIENT_SECRET',
-                    'REDDIT_USERNAME',
-                    'REDDIT_PASSWORD'
-                ],
-                'credentials_map': {
-                    'client_id': 'REDDIT_CLIENT_ID',
-                    'client_secret': 'REDDIT_CLIENT_SECRET',
-                    'username': 'REDDIT_USERNAME',
-                    'password': 'REDDIT_PASSWORD'
+                    'LINKEDIN_CLIENT_ID': 'client_id',
+                    'LINKEDIN_CLIENT_SECRET': 'client_secret',
+                    'LINKEDIN_ACCESS_TOKEN': 'access_token'
                 }
             }
         }
 
-        for network, config in network_configs.items():
-            if all(os.getenv(var) for var in config['required_vars']):
-                credentials = {
-                    cred_key: os.getenv(env_var)
-                    for cred_key, env_var in config['credentials_map'].items()
-                }
+        for network, cfg in network_configs.items():
+            # Check if this platform is enabled
+            enabled = os.getenv(f'{network.upper()}_ENABLED', 'false').lower() == 'true'
+            if not enabled:
+                continue
 
-                # Get rate limits as strings and convert to int if available, else use defaults
-                posts_per_hour_str = os.getenv(f'{network.upper()}_POSTS_PER_HOUR')
-                posts_per_hour = int(posts_per_hour_str) if posts_per_hour_str else self.DEFAULT_CONFIG['rate_limits']['default']['posts_per_hour']
+            # Check if all required vars are present
+            missing_vars = [var for var in cfg['required_vars'] if not os.getenv(var)]
+            if missing_vars:
+                logger.warning(f"{network.capitalize()} is enabled but missing required environment variables: {missing_vars}")
+                continue
 
-                posts_per_day_str = os.getenv(f'{network.upper()}_POSTS_PER_DAY')
-                posts_per_day = int(posts_per_day_str) if posts_per_day_str else self.DEFAULT_CONFIG['rate_limits']['default']['posts_per_day']
+            # Build credentials dictionary with mapped keys
+            credentials = {}
+            for env_var, cred_key in cfg['credentials_map'].items():
+                env_value = os.getenv(env_var)
+                if env_value:
+                    credentials[cred_key] = env_value
 
-                minimum_interval_str = os.getenv(f'{network.upper()}_MINIMUM_INTERVAL')
-                minimum_interval = int(minimum_interval_str) if minimum_interval_str else self.DEFAULT_CONFIG['rate_limits']['default']['minimum_interval']
+            # Load posting rate limits
+            rate_limits = {
+                'posts_per_hour': int(os.getenv(
+                    f'{network.upper()}_POSTS_PER_HOUR',
+                    str(self.DEFAULT_CONFIG['rate_limits']['default']['posts_per_hour'])
+                )),
+                'posts_per_day': int(os.getenv(
+                    f'{network.upper()}_POSTS_PER_DAY',
+                    str(self.DEFAULT_CONFIG['rate_limits']['default']['posts_per_day'])
+                )),
+                'minimum_interval': int(os.getenv(
+                    f'{network.upper()}_MINIMUM_INTERVAL',
+                    str(self.DEFAULT_CONFIG['rate_limits']['default']['minimum_interval'])
+                ))
+            }
 
-                networks[network] = SocialNetworkConfig(
-                    enabled=True,
-                    credentials=credentials,
-                    post_types=['weather', 'earthquake', 'news'],
-                    rate_limits={
-                        'posts_per_hour': posts_per_hour,
-                        'posts_per_day': posts_per_day,
-                        'minimum_interval': minimum_interval
-                    }
-                )
+            networks[network] = SocialNetworkConfig(
+                enabled=True,
+                credentials=credentials,
+                post_types=['weather', 'earthquake', 'news'],
+                rate_limits=rate_limits
+            )
 
         return networks
 
@@ -258,9 +258,7 @@ class ConfigurationManager:
 
     def get_interval(self, task_type: str) -> int:
         """Get update interval for a specific task type."""
-        interval_str = os.getenv(
-            f'{task_type.upper()}_UPDATE_INTERVAL'
-        )
+        interval_str = os.getenv(f'{task_type.upper()}_UPDATE_INTERVAL')
         if interval_str is not None and interval_str.isdigit():
             return int(interval_str)
         return self.DEFAULT_CONFIG.get(task_type, {}).get('update_interval', 3600)
