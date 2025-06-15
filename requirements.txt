@@ -11,7 +11,7 @@ folium==0.15.0
 cartopy==0.22.0
 matplotlib==3.8.2
 numpy==1.26.2
-requests==2.32.2
+requests==2.32.4
 beautifulsoup4==4.12.2
 python-dotenv==1.0.0
 feedparser==6.0.10
