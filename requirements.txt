@@ -1,5 +1,5 @@
 aiohttp==3.13.4
-blueskysocial==1.6.2
+blueskysocial==2.1.0
 tweepy==4.14.0
 facebook-sdk==3.1.0
 pillow==12.2.0
