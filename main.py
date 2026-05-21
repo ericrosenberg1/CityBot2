@@ -6,13 +6,40 @@ import sys
 from datetime import datetime, timedelta
 import os
 
+# =============================================================================
+# SENTRY — initialized FIRST so errors during subsequent imports are captured.
+# =============================================================================
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.asyncio import AsyncioIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+
+    sentry_sdk.init(
+        dsn=os.getenv(
+            "SENTRY_DSN",
+            "https://dd5051420c5e14116bdd3addf5d8bb62@o4507525754060800.ingest.us.sentry.io/4511429590188032",
+        ),
+        environment=os.getenv("APP_ENV", "production"),
+        integrations=[
+            AsyncioIntegration(),
+            LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+        ],
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.2")),
+        profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.2")),
+        send_default_pii=False,
+        release=os.getenv("SENTRY_RELEASE"),
+    )
+except ImportError:
+    pass
+
 from database.operations import DatabaseManager
 from monitors.weather import WeatherMonitor
 from monitors.earthquake import EarthquakeMonitor
 from monitors.news import NewsMonitor
 from social_media import SocialMediaManager
-from social_media.utils import RateLimiter, MapGenerator
+from utils.maps import LocationMapGenerator
 from config import ConfigurationManager
+from posting.queue_manager import QueueManager
 
 # Set up logging
 logging.basicConfig(
@@ -35,7 +62,7 @@ class CityBot:
         self.running = False
         self.tasks = []
         self.shutdown_event = asyncio.Event()
-        
+
         try:
             self.config_manager = ConfigurationManager()
             self.city_config = self.config_manager.city_config
@@ -60,10 +87,8 @@ class CityBot:
             }
 
             self._initialize_components()
-            
-            # Initialize signal handlers
-            signal.signal(signal.SIGINT, self._signal_handler)
-            signal.signal(signal.SIGTERM, self._signal_handler)
+
+            self._loop = None
 
         except Exception as e:
             logger.error("Critical error initializing CityBot: %s", e, exc_info=True)
@@ -103,43 +128,51 @@ class CityBot:
                 self.city_config
             )
 
-            self.rate_limiter = RateLimiter()
-
-            self.map_generator = MapGenerator(
+            self.map_generator = LocationMapGenerator(
                 {'coordinates': self.city_config['coordinates']}
             )
+
+            self.queue_manager = QueueManager(self.db, self.social_media, self.city_config)
 
         except Exception as e:
             logger.error("Critical error initializing components: %s", e, exc_info=True)
             raise
 
-    def _signal_handler(self, signum, frame):
+    def _setup_signal_handlers(self):
+        """Set up signal handlers within the running event loop."""
+        self._loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            self._loop.add_signal_handler(sig, self._signal_handler, sig)
+
+    def _signal_handler(self, signum):
         """Handle shutdown signals."""
-        logger.info(f"Received signal {signum}")
-        if self.running:
-            asyncio.create_task(self.shutdown())
+        logger.info("Received signal %s", signum)
+        if self.running and self._loop:
+            self._loop.create_task(self.shutdown())
 
     async def run(self):
         """Main run loop for the bot."""
         try:
             self.running = True
+            self._setup_signal_handlers()
             logger.info("Starting CityBot tasks...")
-            
+
             # Create all tasks
             self.tasks = [
                 asyncio.create_task(self.weather_task()),
                 asyncio.create_task(self.earthquake_task()),
                 asyncio.create_task(self.news_task()),
+                asyncio.create_task(self.queue_processor_task()),
                 asyncio.create_task(self.maintenance_task())
             ]
-            
+
             # Wait for shutdown signal
             await self.shutdown_event.wait()
-            
+
             # Wait for all tasks to complete
             if self.tasks:
                 await asyncio.gather(*self.tasks, return_exceptions=True)
-                
+
         except Exception as e:
             logger.error("Error in main run loop: %s", e, exc_info=True)
             raise
@@ -150,15 +183,15 @@ class CityBot:
         """Handle graceful shutdown."""
         if not self.running:
             return
-            
+
         logger.info("Initiating shutdown...")
         self.running = False
-        
+
         # Cancel all tasks
         for task in self.tasks:
             if not task.done():
                 task.cancel()
-        
+
         # Signal shutdown
         self.shutdown_event.set()
 
@@ -166,50 +199,33 @@ class CityBot:
         """Clean up resources during shutdown."""
         logger.info("Cleaning up resources...")
         try:
-            # Close social media connections
+            # Close social media connections (also closes its rate limiter)
             await self.social_media.close()
-            
+
             # Close weather monitor
             await self.weather_monitor.cleanup()
-            
-            # Close rate limiter
-            await self.rate_limiter.close()
-            
+
             # Close database connection
             self.db.close()
-            
+
             logger.info("Cleanup completed successfully")
         except Exception as e:
             logger.error("Error during cleanup: %s", e, exc_info=True)
 
     async def weather_task(self):
-        """Handle weather monitoring and posting."""
+        """Handle weather monitoring and enqueuing."""
         try:
             while self.running:
                 try:
                     weather_data = await self.weather_monitor.get_current_conditions()
                     if weather_data is None:
-                        logger.warning("No weather conditions received. Skipping weather post.")
-                        await asyncio.sleep(self.post_intervals['weather'])
-                        continue
-
-                    if await self.rate_limiter.can_post('weather', 'regular'):
-                        results = await self.social_media.post_weather(weather_data)
-                        if any(result.success for result in results.values()):
-                            await self.rate_limiter.record_post('weather', 'regular')
-                            logger.info("Posted weather update successfully")
-                        else:
-                            logger.error("Failed to post weather update to social media")
+                        logger.warning("No weather conditions received. Skipping weather enqueue.")
+                    else:
+                        self.queue_manager.enqueue('weather', weather_data)
 
                     alerts = await self.weather_monitor.get_alerts()
                     for alert in alerts:
-                        if await self.rate_limiter.can_post('weather', 'alert'):
-                            results = await self.social_media.post_weather_alert(alert)
-                            if any(result.success for result in results.values()):
-                                await self.rate_limiter.record_post('weather', 'alert')
-                                logger.info("Posted weather alert: %s", alert.event)
-                            else:
-                                logger.error("Failed to post weather alert: %s", alert.event)
+                        self.queue_manager.enqueue('weather_alert', alert)
 
                 except asyncio.CancelledError:
                     raise
@@ -221,24 +237,16 @@ class CityBot:
             logger.info("Weather task canceled cleanly.")
 
     async def earthquake_task(self):
-        """Handle earthquake monitoring and posting."""
+        """Handle earthquake monitoring and enqueuing."""
         try:
             while self.running:
                 try:
                     earthquakes = await self.earthquake_monitor.check_earthquakes()
                     for quake in earthquakes:
-                        if await self.rate_limiter.can_post('earthquake', 'alert'):
-                            map_path = await self.map_generator.generate_earthquake_map(quake)
-                            if map_path:
-                                quake['map_path'] = str(map_path)
-                            results = await self.social_media.post_earthquake(quake)
-                            if any(result.success for result in results.values()):
-                                await self.rate_limiter.record_post('earthquake', 'alert')
-                                magnitude = quake.get('magnitude', 'Unknown')
-                                logger.info("Posted earthquake update: M%s", magnitude)
-                            else:
-                                magnitude = quake.get('magnitude', 'Unknown')
-                                logger.error("Failed to post earthquake update: M%s", magnitude)
+                        map_path = await self.map_generator.generate_location_map(quake)
+                        if map_path:
+                            quake['map_path'] = str(map_path)
+                        self.queue_manager.enqueue('earthquake', quake)
 
                 except asyncio.CancelledError:
                     raise
@@ -250,19 +258,13 @@ class CityBot:
             logger.info("Earthquake task canceled cleanly.")
 
     async def news_task(self):
-        """Handle news monitoring and posting."""
+        """Handle news monitoring and enqueuing."""
         try:
             while self.running:
                 try:
                     articles = await self.news_monitor.check_news()
                     for article in articles:
-                        if await self.rate_limiter.can_post('news', 'regular'):
-                            results = await self.social_media.post_news(article)
-                            if any(result.success for result in results.values()):
-                                await self.rate_limiter.record_post('news', 'regular')
-                                logger.info("Posted news article: %s", article.title)
-                            else:
-                                logger.error("Failed to post news article: %s", article.title)
+                        self.queue_manager.enqueue('news', article)
 
                 except asyncio.CancelledError:
                     raise
@@ -273,12 +275,26 @@ class CityBot:
         except asyncio.CancelledError:
             logger.info("News task canceled cleanly.")
 
+    async def queue_processor_task(self):
+        """Process the posting queue on a regular interval."""
+        try:
+            while self.running:
+                try:
+                    await self.queue_manager.process_queue()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    logger.error("Error in queue processor task: %s", e, exc_info=True)
+
+                await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            logger.info("Queue processor task canceled cleanly.")
+
     async def maintenance_task(self):
         """Handle system maintenance."""
         try:
             while self.running:
                 try:
-                    await self.rate_limiter.cleanup_old_records()
                     self.db.cleanup_old_records()
 
                     cleanup_time = datetime.now() - timedelta(days=7)
@@ -287,7 +303,7 @@ class CityBot:
                             for file in os.listdir(directory):
                                 file_path = os.path.join(directory, file)
                                 try:
-                                    if datetime.fromtimestamp(os.path.getctime(file_path)) < cleanup_time:
+                                    if os.path.isfile(file_path) and datetime.fromtimestamp(os.path.getctime(file_path)) < cleanup_time:
                                         os.remove(file_path)
                                 except Exception as e:
                                     logger.warning("Could not remove file %s: %s", file_path, e)

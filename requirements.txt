@@ -23,3 +23,5 @@ anyio>=4.4.0
 setuptools>=70.0.0
 urllib3>=2.2.2
 zipp>=3.19.1
+# Error + performance monitoring
+sentry-sdk>=2.18
