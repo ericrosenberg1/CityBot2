@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Opt in to Node.js 24 ahead of GitHub's forced cutover on 2026-06-02.
+  # Remove once the actions used here ship versions that default to Node.js 24.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   lint:
     name: Lint
