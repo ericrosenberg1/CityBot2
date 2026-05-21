@@ -1,0 +1,5 @@
+# Web dashboard dependencies — these are now included in the root requirements.txt.
+# Install from the project root: pip install -r requirements.txt
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+jinja2>=3.1.2
