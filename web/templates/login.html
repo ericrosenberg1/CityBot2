@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% set active_page = "login" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="card" style="max-width: 400px; margin: 0 auto;">
+        <div class="card-header">
+            <h3>Login to CityBot2</h3>
+        </div>
+
+        {% if error %}
+        <div class="flash-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/login">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary" style="width:100%;">Login</button>
+            </div>
+        </form>
+
+        {% if show_setup %}
+        <div style="text-align:center; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+            <a href="/setup">First time? Set up admin account</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

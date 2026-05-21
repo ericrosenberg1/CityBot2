@@ -1,0 +1,51 @@
+services:
+  citybot:
+    build: .
+    image: citybot2:latest
+    container_name: citybot2
+    restart: unless-stopped
+    volumes:
+      - citybot-data:/app/data
+      - citybot-config:/app/config
+      - citybot-logs:/app/logs
+      - citybot-cache:/app/cache
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CITYBOT_MODE: ${CITYBOT_MODE:-all}
+      CITYBOT_PORT: "8080"
+      TZ: ${TZ:-America/Los_Angeles}
+    # When using Caddy (CITYBOT_DOMAIN is set), don't expose ports directly.
+    # When no domain, expose the port for direct access.
+    ports:
+      - "${CITYBOT_PORT:-8080}:8080"
+
+  # ── Reverse proxy (enabled when CITYBOT_DOMAIN is set) ──────────
+  # Provides automatic HTTPS via Let's Encrypt.
+  # To enable: set CITYBOT_DOMAIN in .env and use the caddy profile.
+  caddy:
+    image: caddy:2-alpine
+    container_name: citybot2-caddy
+    restart: unless-stopped
+    profiles: ["caddy"]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      CITYBOT_DOMAIN: ${CITYBOT_DOMAIN:-localhost}
+    depends_on:
+      - citybot
+
+volumes:
+  citybot-data:
+  citybot-config:
+  citybot-logs:
+  citybot-cache:
+  caddy-data:
+  caddy-config:

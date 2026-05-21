@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% set active_page = "sources" %}
+
+{% block title %}Data Sources{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Data Sources</h1>
+    <div class="subtitle">Manage RSS feeds, weather, and earthquake data sources</div>
+</div>
+
+<!-- Add Source Form -->
+<div class="card">
+    <div class="card-header">
+        <h3>Add New Source</h3>
+    </div>
+    <form method="post" action="/admin/sources">
+        <div class="grid-3" style="margin-bottom:1rem;">
+            <div class="form-group">
+                <label for="name">Source Name</label>
+                <input type="text" id="name" name="name" required placeholder="e.g., Local News RSS">
+            </div>
+            <div class="form-group">
+                <label for="source_type">Type</label>
+                <select id="source_type" name="source_type" required>
+                    <option value="rss">RSS Feed</option>
+                    <option value="weather">Weather</option>
+                    <option value="earthquake">Earthquake</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="url">URL</label>
+                <input type="url" id="url" name="url" placeholder="https://example.com/feed.xml">
+            </div>
+        </div>
+        <div class="grid-3" style="margin-bottom:1rem;">
+            <div class="form-group">
+                <label for="priority">Priority</label>
+                <select id="priority" name="priority">
+                    <option value="1">High (1)</option>
+                    <option value="2" selected>Normal (2)</option>
+                    <option value="3">Low (3)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="check_interval">Check Interval (minutes)</label>
+                <input type="number" id="check_interval" name="check_interval" value="30" min="5" max="1440">
+            </div>
+            <div class="form-group" style="display:flex; align-items:flex-end; padding-bottom:0.4rem;">
+                <button type="submit" class="btn btn-primary">Add Source</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Sources Table -->
+<div class="card">
+    <div class="card-header">
+        <h3>Configured Sources</h3>
+        <span class="badge badge-muted">{{ sources|length }} sources</span>
+    </div>
+    {% if sources %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>URL</th>
+                    <th>Enabled</th>
+                    <th>Priority</th>
+                    <th>Last Checked</th>
+                    <th>Filters</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for src in sources %}
+                <tr>
+                    <td style="font-weight:600;">{{ src.name }}</td>
+                    <td>
+                        <span class="badge {% if src.source_type == 'rss' %}badge-success{% elif src.source_type == 'weather' %}badge-primary{% else %}badge-danger{% endif %}">
+                            {{ src.source_type }}
+                        </span>
+                    </td>
+                    <td class="truncate" style="max-width:200px;">{{ src.url or '--' }}</td>
+                    <td>
+                        {% if src.is_enabled %}
+                        <span class="badge badge-success">Enabled</span>
+                        {% else %}
+                        <span class="badge badge-muted">Disabled</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ src.priority }}</td>
+                    <td style="white-space:nowrap;">{{ src.last_checked|fmt_rel if src.last_checked else 'Never' }}</td>
+                    <td>{{ src.keyword_filters|length }}</td>
+                    <td style="white-space:nowrap;">
+                        <form method="post" action="/admin/sources/{{ src.id }}/toggle" style="display:inline;">
+                            <button type="submit" class="btn btn-sm {% if src.is_enabled %}btn-danger{% else %}btn-primary{% endif %}">
+                                {{ 'Disable' if src.is_enabled else 'Enable' }}
+                            </button>
+                        </form>
+                        <form method="post" action="/admin/sources/{{ src.id }}/delete" style="display:inline; margin-left:0.25rem;">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this source?')">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                <!-- Keyword Filters Row -->
+                {% if src.keyword_filters or true %}
+                <tr>
+                    <td colspan="8" style="background:var(--surface-alt); padding:0.75rem;">
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
+                            {% set must = src.keyword_filters|selectattr('filter_type', 'equalto', 'must_include')|list %}
+                            {% set any_of = src.keyword_filters|selectattr('filter_type', 'equalto', 'at_least_one')|list %}
+                            {% set exclude = src.keyword_filters|selectattr('filter_type', 'equalto', 'exclude')|list %}
+
+                            <div>
+                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.4rem; font-weight:600;">Must Include</div>
+                                {% for kw in must %}
+                                <div style="display:flex; align-items:center; gap:0.25rem; margin-bottom:0.2rem;">
+                                    <span class="badge badge-success">{{ kw.keyword }}</span>
+                                    <form method="post" action="/admin/sources/{{ src.id }}/keywords/{{ kw.id }}/delete" style="display:inline;">
+                                        <button type="submit" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.75rem;">&times;</button>
+                                    </form>
+                                </div>
+                                {% endfor %}
+                                <form method="post" action="/admin/sources/{{ src.id }}/keywords" style="display:flex; gap:0.25rem; margin-top:0.3rem;">
+                                    <input type="hidden" name="filter_type" value="must_include">
+                                    <input type="text" name="keyword" placeholder="Add keyword" style="padding:0.2rem 0.4rem; font-size:0.75rem; width:100px; background:var(--overlay); border:1px solid var(--border); border-radius:0.25rem; color:var(--text);">
+                                    <button type="submit" class="btn btn-sm btn-primary">+</button>
+                                </form>
+                            </div>
+
+                            <div>
+                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.4rem; font-weight:600;">At Least One</div>
+                                {% for kw in any_of %}
+                                <div style="display:flex; align-items:center; gap:0.25rem; margin-bottom:0.2rem;">
+                                    <span class="badge badge-info">{{ kw.keyword }}</span>
+                                    <form method="post" action="/admin/sources/{{ src.id }}/keywords/{{ kw.id }}/delete" style="display:inline;">
+                                        <button type="submit" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.75rem;">&times;</button>
+                                    </form>
+                                </div>
+                                {% endfor %}
+                                <form method="post" action="/admin/sources/{{ src.id }}/keywords" style="display:flex; gap:0.25rem; margin-top:0.3rem;">
+                                    <input type="hidden" name="filter_type" value="at_least_one">
+                                    <input type="text" name="keyword" placeholder="Add keyword" style="padding:0.2rem 0.4rem; font-size:0.75rem; width:100px; background:var(--overlay); border:1px solid var(--border); border-radius:0.25rem; color:var(--text);">
+                                    <button type="submit" class="btn btn-sm btn-primary">+</button>
+                                </form>
+                            </div>
+
+                            <div>
+                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.4rem; font-weight:600;">Exclude</div>
+                                {% for kw in exclude %}
+                                <div style="display:flex; align-items:center; gap:0.25rem; margin-bottom:0.2rem;">
+                                    <span class="badge badge-danger">{{ kw.keyword }}</span>
+                                    <form method="post" action="/admin/sources/{{ src.id }}/keywords/{{ kw.id }}/delete" style="display:inline;">
+                                        <button type="submit" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.75rem;">&times;</button>
+                                    </form>
+                                </div>
+                                {% endfor %}
+                                <form method="post" action="/admin/sources/{{ src.id }}/keywords" style="display:flex; gap:0.25rem; margin-top:0.3rem;">
+                                    <input type="hidden" name="filter_type" value="exclude">
+                                    <input type="text" name="keyword" placeholder="Add keyword" style="padding:0.2rem 0.4rem; font-size:0.75rem; width:100px; background:var(--overlay); border:1px solid var(--border); border-radius:0.25rem; color:var(--text);">
+                                    <button type="submit" class="btn btn-sm btn-primary">+</button>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">&#9881;</div>
+        <div>No data sources configured yet</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

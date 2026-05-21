@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% set active_page = "social" %}
+
+{% block title %}Social Accounts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Social Accounts</h1>
+    <div class="subtitle">Connect and manage social media platforms</div>
+</div>
+
+<div class="platform-grid">
+    {% for platform, fields in platform_fields.items() %}
+    <div class="platform-card">
+        <div class="card-header">
+            <h3>{{ platform|title }}</h3>
+            {% if platform in connected %}
+            <span class="badge badge-success">Connected</span>
+            {% else %}
+            <span class="badge badge-muted">Not Connected</span>
+            {% endif %}
+        </div>
+
+        {% if platform in connected %}
+        <div style="margin-bottom:1rem;">
+            <span style="font-size:0.85rem; color:var(--text-muted);">
+                Account: <strong style="color:var(--text);">{{ connected[platform].account_name or 'N/A' }}</strong>
+            </span>
+        </div>
+        <form method="post" action="/admin/social/{{ connected[platform].id }}/disconnect">
+            <button type="submit" class="btn btn-danger btn-sm">Disconnect</button>
+        </form>
+        {% else %}
+        <form method="post" action="/admin/social/connect">
+            <input type="hidden" name="platform" value="{{ platform }}">
+            {% for field in fields %}
+            <div class="form-group">
+                <label for="{{ platform }}_{{ field }}">{{ field|replace('_', ' ')|title }}</label>
+                <input type="{% if 'password' in field or 'secret' in field or 'token' in field %}password{% else %}text{% endif %}"
+                       id="{{ platform }}_{{ field }}"
+                       name="{{ field }}"
+                       placeholder="{{ field|replace('_', ' ') }}">
+            </div>
+            {% endfor %}
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary btn-sm">Connect</button>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% set active_page = "announcements" %}
+
+{% block title %}Announcements{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Announcements</h1>
+    <div class="subtitle">Create and manage community announcements</div>
+</div>
+
+<!-- Create Form -->
+<div class="card">
+    <div class="card-header">
+        <h3>New Announcement</h3>
+    </div>
+    <form method="post" action="/admin/announcements">
+        <div class="form-group">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" required placeholder="Announcement title">
+        </div>
+        <div class="form-group">
+            <label for="body">Body</label>
+            <textarea id="body" name="body" required rows="4" placeholder="Write your announcement here..."></textarea>
+        </div>
+        <div class="form-group">
+            <label for="scheduled_for">Schedule For (optional)</label>
+            <input type="datetime-local" id="scheduled_for" name="scheduled_for">
+        </div>
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">Create Announcement</button>
+        </div>
+    </form>
+</div>
+
+<!-- Announcements List -->
+<div class="card">
+    <div class="card-header">
+        <h3>All Announcements</h3>
+        <span class="badge badge-muted">{{ announcements|length }} total</span>
+    </div>
+
+    {% if announcements %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Created By</th>
+                    <th>Created</th>
+                    <th>Scheduled</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in announcements %}
+                <tr>
+                    <td>
+                        <strong style="color:var(--text-bright);">{{ a.title }}</strong>
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.25rem;">
+                            {{ a.body[:120] }}{% if a.body|length > 120 %}...{% endif %}
+                        </div>
+                    </td>
+                    <td>{{ a.creator_name }}</td>
+                    <td>{{ a.created_at|fmt_ts }}</td>
+                    <td>{{ a.scheduled_for|fmt_ts if a.scheduled_for else '--' }}</td>
+                    <td>
+                        {% if a.posted %}
+                        <span class="badge badge-success">Posted</span>
+                        {% elif a.scheduled_for %}
+                        <span class="badge badge-warning">Scheduled</span>
+                        {% else %}
+                        <span class="badge badge-info">Draft</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">&#9998;</div>
+        <p>No announcements yet</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

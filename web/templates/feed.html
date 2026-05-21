@@ -1,0 +1,176 @@
+{% extends "base_public.html" %}
+{% set active_page = "feed" %}
+
+{% block title %}{{ city.get('name', 'CityBot2') }} - Local Updates{% endblock %}
+
+{% block meta %}
+<meta http-equiv="refresh" content="120">
+<meta name="description" content="{{ city.get('description', 'Local community news and updates') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero">
+    <div class="hero-inner">
+        <div class="hero-text">
+            <h1 class="hero-title">{{ city.get('name', 'CityBot2') }}</h1>
+            <p class="hero-tagline">{{ city.get('description', 'Your source for local news, weather, and seismic activity') }}</p>
+        </div>
+        {% if weather %}
+        <div class="weather-summary">
+            <div class="weather-temp">
+                {{ weather.temperature|round(0)|int if weather.temperature is not none else '--' }}&deg;F
+            </div>
+            <div class="weather-details">
+                {% if weather.wind_speed %}
+                <span>Wind {{ weather.wind_speed }} mph {{ weather.wind_direction or '' }}</span>
+                {% endif %}
+                {% if weather.cloud_cover is not none %}
+                <span>{{ weather.cloud_cover }}% clouds</span>
+                {% endif %}
+            </div>
+            {% if weather.forecast %}
+            <div class="weather-forecast-brief">{{ weather.forecast[:120] }}{% if weather.forecast|length > 120 %}...{% endif %}</div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Weather Alert Banners -->
+{% if alerts %}
+{% for alert in alerts %}
+<div class="hero-alert-banner">
+    <span class="alert-icon">&#9888;</span>
+    <strong>{{ alert.event }}</strong> &mdash; {{ alert.headline }}
+    <span class="badge badge-danger" style="margin-left:auto;">{{ alert.severity }}</span>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Filter Tabs -->
+<section class="feed-section">
+    <div class="feed-tabs">
+        <a href="/" class="feed-tab {% if not current_type %}active{% endif %}">All</a>
+        <a href="/?type=weather" class="feed-tab {% if current_type == 'weather' %}active{% endif %}">Weather</a>
+        <a href="/?type=earthquake" class="feed-tab {% if current_type == 'earthquake' %}active{% endif %}">Earthquakes</a>
+        <a href="/?type=news" class="feed-tab {% if current_type == 'news' %}active{% endif %}">News</a>
+        <a href="/?type=announcement" class="feed-tab {% if current_type == 'announcement' %}active{% endif %}">Announcements</a>
+    </div>
+
+    <div class="feed-layout">
+        <!-- Feed Grid -->
+        <div class="feed-grid">
+            {% if feed_items %}
+                {% for item in feed_items %}
+                <article class="feed-card">
+                    {% if item.image_url %}
+                    <div class="card-image">
+                        <img src="{{ item.image_url }}" alt="" loading="lazy">
+                    </div>
+                    {% endif %}
+                    <div class="card-body">
+                        <span class="card-badge badge-{{ item.content_type }}">
+                            {% if item.content_type == 'weather' %}&#9729; Weather
+                            {% elif item.content_type == 'earthquake' %}&#9886; Earthquake
+                            {% elif item.content_type == 'news' %}&#9993; News
+                            {% elif item.content_type == 'announcement' %}&#9998; Announcement
+                            {% else %}{{ item.content_type }}
+                            {% endif %}
+                        </span>
+                        {% if item.title %}
+                        <h3 class="card-title">
+                            {% if item.link_url %}
+                            <a href="{{ item.link_url }}" target="_blank" rel="noopener">{{ item.title }}</a>
+                            {% else %}
+                            {{ item.title }}
+                            {% endif %}
+                        </h3>
+                        {% endif %}
+                        <p class="card-snippet">{{ item.content_text[:180] }}{% if item.content_text|length > 180 %}...{% endif %}</p>
+                        <div class="card-meta">
+                            {% if item.source_name %}
+                            <span class="card-source">{{ item.source_name }}</span>
+                            {% endif %}
+                            <span class="card-time">{{ item.posted_at|fmt_rel }}</span>
+                        </div>
+                        {% if item.link_url and item.content_type == 'news' %}
+                        <a href="{{ item.link_url }}" target="_blank" rel="noopener" class="card-readmore">Read more &rarr;</a>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+
+                {% if has_more %}
+                <div class="feed-load-more">
+                    <a href="/?{% if current_type %}type={{ current_type }}&{% endif %}page={{ page + 1 }}" class="btn btn-primary">Load More</a>
+                </div>
+                {% endif %}
+            {% else %}
+            <div class="feed-empty">
+                <div class="feed-empty-icon">&#9993;</div>
+                <h3>No updates yet</h3>
+                <p>Check back soon for local news, weather reports, and earthquake alerts for {{ city.get('name', 'your area') }}.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <aside class="feed-sidebar">
+            <!-- Current Conditions -->
+            {% if weather %}
+            <div class="sidebar-widget">
+                <h4 class="widget-title">Current Conditions</h4>
+                <div class="widget-weather">
+                    <div class="widget-temp">{{ weather.temperature|round(0)|int if weather.temperature is not none else '--' }}&deg;F</div>
+                    <div class="widget-weather-details">
+                        {% if weather.wind_speed %}
+                        <div>Wind: {{ weather.wind_speed }} mph {{ weather.wind_direction or '' }}</div>
+                        {% endif %}
+                        {% if weather.cloud_cover is not none %}
+                        <div>Cloud cover: {{ weather.cloud_cover }}%</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if weather.forecast %}
+                <p class="widget-forecast">{{ weather.forecast[:200] }}{% if weather.forecast|length > 200 %}...{% endif %}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Recent Earthquakes -->
+            {% if recent_earthquakes %}
+            <div class="sidebar-widget">
+                <h4 class="widget-title">Recent Earthquakes</h4>
+                <ul class="widget-eq-list">
+                    {% for eq in recent_earthquakes %}
+                    <li>
+                        <span class="eq-mag {% if eq.magnitude is not none and eq.magnitude >= 4.0 %}mag-strong{% elif eq.magnitude is not none and eq.magnitude >= 3.0 %}mag-moderate{% elif eq.magnitude is not none and eq.magnitude >= 2.0 %}mag-light{% else %}mag-minor{% endif %}">
+                            {{ eq.magnitude|round(1) if eq.magnitude is not none else '?' }}
+                        </span>
+                        <div class="eq-info">
+                            <div class="eq-location">{{ eq.location or 'Unknown' }}</div>
+                            <div class="eq-time">{{ eq.timestamp|fmt_rel }} &middot; {{ eq.distance|round(1) if eq.distance is not none else '--' }} mi</div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <a href="/earthquakes" class="widget-more-link">View all earthquakes &rarr;</a>
+            </div>
+            {% endif %}
+
+            <!-- Subscribe CTA -->
+            <div class="sidebar-widget sidebar-cta">
+                <h4 class="widget-title">Stay Informed</h4>
+                <p>Get {{ city.get('name', 'local') }} updates delivered to your inbox.</p>
+                <a href="/subscribe" class="btn btn-primary btn-block">Subscribe</a>
+            </div>
+
+            <!-- RSS -->
+            <div class="sidebar-widget">
+                <a href="/feed.xml" class="widget-rss-link">&#9776; Subscribe via RSS</a>
+            </div>
+        </aside>
+    </div>
+</section>
+{% endblock %}

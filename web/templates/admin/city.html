@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% set active_page = "city_settings" %}
+
+{% block title %}City Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>City Settings</h1>
+    <div class="subtitle">Configure city information and data sources</div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>City Configuration</h3>
+    </div>
+
+    <form method="post" action="/admin/city">
+        <div class="grid-2">
+            <div>
+                <div class="form-group">
+                    <label for="city_name">City Name</label>
+                    <input type="text" id="city_name" name="city_name" value="{{ city_config.get('name', '') }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="state">State</label>
+                    <input type="text" id="state" name="state" value="{{ city_config.get('state', '') }}">
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <input type="text" id="description" name="description" value="{{ city_config.get('description', '') }}">
+                </div>
+                <div class="form-group">
+                    <label for="timezone">Timezone</label>
+                    <input type="text" id="timezone" name="timezone" value="{{ city_config.get('timezone', '') }}" placeholder="America/Los_Angeles">
+                </div>
+            </div>
+            <div>
+                {% set coords = city_config.get('coordinates', {}) %}
+                <div class="form-group">
+                    <label for="latitude">Latitude</label>
+                    <input type="text" id="latitude" name="latitude" value="{{ coords.get('latitude', '') }}">
+                </div>
+                <div class="form-group">
+                    <label for="longitude">Longitude</label>
+                    <input type="text" id="longitude" name="longitude" value="{{ coords.get('longitude', '') }}">
+                </div>
+                {% set weather = city_config.get('weather', {}) %}
+                <div class="form-group">
+                    <label for="weather_zone">Weather Zone</label>
+                    <input type="text" id="weather_zone" name="weather_zone" value="{{ weather.get('zone', '') }}" placeholder="CAZ350">
+                </div>
+                <div class="form-group">
+                    <label for="radar_station">Radar Station</label>
+                    <input type="text" id="radar_station" name="radar_station" value="{{ weather.get('radar_station', '') }}" placeholder="VTX">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top:1rem;">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

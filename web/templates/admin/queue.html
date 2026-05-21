@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% set active_page = "queue" %}
+
+{% block title %}Post Queue{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Post Queue</h1>
+    <div class="subtitle">Manage pending, posted, and failed items</div>
+</div>
+
+<!-- Stats Row -->
+<div class="grid-4" style="margin-bottom:1.25rem;">
+    <div class="stat-card warning">
+        <div class="stat-value">{{ queue_stats.pending }}</div>
+        <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-value">{{ queue_stats.posted_today }}</div>
+        <div class="stat-label">Posted Today</div>
+    </div>
+    <div class="stat-card danger">
+        <div class="stat-value">{{ queue_stats.failed }}</div>
+        <div class="stat-label">Failed</div>
+    </div>
+    <div class="stat-card info">
+        <div class="stat-value">{{ queue_stats.drip_rate }}</div>
+        <div class="stat-label">Posts/Hour</div>
+    </div>
+</div>
+
+<!-- Pending Items -->
+<div class="card">
+    <div class="card-header">
+        <h3>Pending Items</h3>
+        <span class="badge badge-warning">{{ pending_items|length }} pending</span>
+    </div>
+    {% if pending_items %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Priority</th>
+                    <th>Title</th>
+                    <th>Created</th>
+                    <th>Scheduled For</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in pending_items %}
+                <tr>
+                    <td>
+                        <span class="badge badge-{{ item.content_type }}">{{ item.content_type }}</span>
+                    </td>
+                    <td>
+                        <span class="badge {% if item.priority == 'immediate' %}badge-danger{% elif item.priority == 'scheduled' %}badge-warning{% else %}badge-muted{% endif %}">
+                            {{ item.priority }}
+                        </span>
+                    </td>
+                    <td class="truncate" style="max-width:300px;">{{ item.title or item.content_text[:80] }}</td>
+                    <td style="white-space:nowrap;">{{ item.created_at|fmt_rel }}</td>
+                    <td style="white-space:nowrap;">{{ item.scheduled_for|fmt_ts if item.scheduled_for else 'ASAP' }}</td>
+                    <td style="white-space:nowrap;">
+                        <form method="post" action="/admin/queue/{{ item.id }}/post-now" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-primary">Post Now</button>
+                        </form>
+                        <form method="post" action="/admin/queue/{{ item.id }}/cancel" style="display:inline; margin-left:0.25rem;">
+                            <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">&#10003;</div>
+        <div>No pending items</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Recent Posts -->
+<div class="card">
+    <div class="card-header">
+        <h3>Recently Posted</h3>
+        <span class="badge badge-success">{{ recent_posts|length }} items</span>
+    </div>
+    {% if recent_posts %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Title</th>
+                    <th>Posted At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in recent_posts %}
+                <tr>
+                    <td><span class="badge badge-{{ item.content_type }}">{{ item.content_type }}</span></td>
+                    <td class="truncate" style="max-width:400px;">{{ item.title or item.content_text[:80] }}</td>
+                    <td style="white-space:nowrap;">{{ item.posted_at|fmt_ts }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">&#10148;</div>
+        <div>No recently posted items</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Failed Items -->
+{% if failed_items %}
+<div class="card" style="border-color:rgba(239,68,68,0.4);">
+    <div class="card-header">
+        <h3>Failed Items</h3>
+        <span class="badge badge-danger">{{ failed_items|length }} failed</span>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Title</th>
+                    <th>Error</th>
+                    <th>Retries</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in failed_items %}
+                <tr>
+                    <td><span class="badge badge-{{ item.content_type }}">{{ item.content_type }}</span></td>
+                    <td class="truncate" style="max-width:250px;">{{ item.title or item.content_text[:80] }}</td>
+                    <td class="truncate" style="max-width:200px; color:var(--danger);">{{ item.error_message or 'Unknown error' }}</td>
+                    <td>{{ item.retry_count }}/{{ item.max_retries }}</td>
+                    <td>
+                        <form method="post" action="/admin/queue/{{ item.id }}/post-now" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-primary">Retry</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

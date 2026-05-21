@@ -1,0 +1,80 @@
+{% extends "base_public.html" %}
+{% set active_page = "news" %}
+
+{% block title %}News{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>News Feed</h1>
+    <div class="subtitle">Local news articles monitored for {{ city.get('name', 'your city') }}</div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Articles</h3>
+        <span class="badge badge-muted">{{ articles|length }} articles</span>
+    </div>
+    {% if articles %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Source</th>
+                    <th>Relevance</th>
+                    <th>Published</th>
+                    <th>Collected</th>
+                    <th>Posted</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for article in articles %}
+                <tr>
+                    <td>
+                        {% if article.url %}
+                        <a href="{{ article.url }}" target="_blank" style="font-weight:500;">{{ article.title or 'Untitled' }}</a>
+                        {% else %}
+                        <span style="font-weight:500;">{{ article.title or 'Untitled' }}</span>
+                        {% endif %}
+                        {% if article.content_snippet %}
+                        <div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem; max-width:350px;">
+                            {{ article.content_snippet[:120] }}{% if article.content_snippet|length > 120 %}...{% endif %}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td style="white-space:nowrap;">{{ article.source or '--' }}</td>
+                    <td>
+                        {% if article.relevance_score is not none %}
+                        {% set pct = (article.relevance_score * 100)|round(0)|int %}
+                        <span class="relevance-bar {% if pct >= 70 %}relevance-high{% elif pct >= 40 %}relevance-medium{% else %}relevance-low{% endif %}">
+                            <span class="fill" style="width:{{ pct }}%"></span>
+                        </span>
+                        <span style="font-size:0.8rem;">{{ pct }}%</span>
+                        {% else %}
+                        <span style="color:var(--text-muted);">--</span>
+                        {% endif %}
+                    </td>
+                    <td style="white-space:nowrap;">
+                        {% if article.published_date %}
+                        {{ article.published_date|fmt_ts }}<br>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">{{ article.published_date|fmt_rel }}</span>
+                        {% else %}--{% endif %}
+                    </td>
+                    <td style="white-space:nowrap;">{{ article.timestamp|fmt_rel }}</td>
+                    <td>
+                        {% if article.posted %}<span class="badge badge-success">Yes</span>
+                        {% else %}<span class="badge badge-muted">No</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">&#9993;</div>
+        <div>No news articles collected yet</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

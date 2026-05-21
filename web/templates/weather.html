@@ -1,0 +1,176 @@
+{% extends "base_public.html" %}
+{% set active_page = "weather" %}
+
+{% block title %}Weather{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Weather</h1>
+    <div class="subtitle">{{ city.get('weather', {}).get('description', 'Weather reports and alerts') }}</div>
+</div>
+
+<!-- Active Alerts -->
+{% if active_alerts %}
+<div class="card" style="border-color:rgba(239,68,68,0.4);">
+    <div class="card-header">
+        <h3>&#9888; Active Alerts</h3>
+        <span class="badge badge-danger">{{ active_alerts|length }} active</span>
+    </div>
+    {% for alert in active_alerts %}
+    <div style="{% if not loop.last %}margin-bottom:1rem; padding-bottom:1rem; border-bottom:1px solid var(--border);{% endif %}">
+        <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
+            <span class="severity-{{ (alert.severity or 'unknown')|lower }}">{{ alert.event or 'Alert' }}</span>
+            <span class="badge badge-warning">{{ alert.severity or 'Unknown' }}</span>
+            <span class="badge badge-muted">{{ alert.urgency or '' }}</span>
+        </div>
+        {% if alert.headline %}
+        <div style="font-weight:600; margin-bottom:0.4rem;">{{ alert.headline }}</div>
+        {% endif %}
+        {% if alert.description %}
+        <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.4rem;">{{ alert.description[:300] }}{% if alert.description|length > 300 %}...{% endif %}</div>
+        {% endif %}
+        <div style="font-size:0.75rem; color:var(--text-muted);">
+            {% if alert.areas %}Areas: {{ alert.areas }} &middot; {% endif %}
+            {% if alert.onset %}Onset: {{ alert.onset|fmt_ts }} &middot; {% endif %}
+            Expires: {{ alert.expires|fmt_ts }}
+            {% if alert.posted %} &middot; <span class="badge badge-success">Posted</span>{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Current Conditions -->
+{% if reports %}
+{% set current = reports[0] %}
+<div class="card">
+    <div class="card-header">
+        <h3>&#9729; Current Conditions</h3>
+        <span class="badge badge-info">{{ current.timestamp|fmt_rel }}</span>
+    </div>
+    <div class="grid-4">
+        <div style="text-align:center;">
+            <div style="font-size:2.5rem; font-weight:700; color:var(--text-bright);">
+                {{ current.temperature|round(0)|int if current.temperature is not none else '--' }}&deg;F
+            </div>
+            <div style="color:var(--text-muted); font-size:0.8rem;">Temperature</div>
+        </div>
+        <div style="text-align:center;">
+            <div style="font-size:2rem; font-weight:700; color:var(--text-bright);">
+                {{ current.wind_speed or '--' }}
+            </div>
+            <div style="color:var(--text-muted); font-size:0.8rem;">Wind (mph) {{ current.wind_direction or '' }}</div>
+        </div>
+        <div style="text-align:center;">
+            <div style="font-size:2rem; font-weight:700; color:var(--text-bright);">
+                {{ current.cloud_cover if current.cloud_cover is not none else '--' }}%
+            </div>
+            <div style="color:var(--text-muted); font-size:0.8rem;">Cloud Cover</div>
+        </div>
+        <div style="text-align:center;">
+            {% if current.posted %}
+            <span class="badge badge-success">Posted</span>
+            {% else %}
+            <span class="badge badge-muted">Not Posted</span>
+            {% endif %}
+        </div>
+    </div>
+    {% if current.forecast %}
+    <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border);">
+        <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Forecast</div>
+        <div class="forecast-text">{{ current.forecast }}</div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Weather History -->
+<div class="card">
+    <div class="card-header">
+        <h3>Weather History</h3>
+        <span class="badge badge-muted">{{ reports|length }} reports</span>
+    </div>
+    {% if reports %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Temp (&deg;F)</th>
+                    <th>Wind</th>
+                    <th>Cloud Cover</th>
+                    <th>Posted</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reports %}
+                <tr>
+                    <td style="white-space:nowrap;">{{ r.timestamp|fmt_ts }}</td>
+                    <td>{{ r.temperature|round(1) if r.temperature is not none else '--' }}</td>
+                    <td>{{ r.wind_speed or '--' }} mph {{ r.wind_direction or '' }}</td>
+                    <td>{{ r.cloud_cover if r.cloud_cover is not none else '--' }}%</td>
+                    <td>
+                        {% if r.posted %}<span class="badge badge-success">Yes</span>
+                        {% else %}<span class="badge badge-muted">No</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">&#9729;</div>
+        <div>No weather reports recorded yet</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- All Alerts History -->
+<div class="card">
+    <div class="card-header">
+        <h3>Alert History</h3>
+        <span class="badge badge-muted">{{ all_alerts|length }} alerts</span>
+    </div>
+    {% if all_alerts %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Event</th>
+                    <th>Severity</th>
+                    <th>Headline</th>
+                    <th>Onset</th>
+                    <th>Expires</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in all_alerts %}
+                <tr>
+                    <td style="font-weight:600;">{{ a.event or '--' }}</td>
+                    <td><span class="severity-{{ (a.severity or 'unknown')|lower }}">{{ a.severity or '--' }}</span></td>
+                    <td class="truncate">{{ a.headline or '--' }}</td>
+                    <td style="white-space:nowrap;">{{ a.onset|fmt_ts }}</td>
+                    <td style="white-space:nowrap;">{{ a.expires|fmt_ts }}</td>
+                    <td>
+                        {% if a.expires and a.expires > now %}
+                            <span class="badge badge-warning">Active</span>
+                        {% else %}
+                            <span class="badge badge-muted">Expired</span>
+                        {% endif %}
+                        {% if a.posted %}<span class="badge badge-success">Posted</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">&#9888;</div>
+        <div>No weather alerts recorded</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

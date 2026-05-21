@@ -164,13 +164,13 @@ class DatabaseManager:
                     # Update item status
                     session.merge(item)
                     item.posted = True
-                    
+
                     # Create post history entry with appropriate foreign key
                     history = PostHistory(
                         platform=platform,
                         item_type=type(item).__name__
                     )
-                    
+
                     # Set the appropriate relationship
                     if isinstance(item, WeatherReport):
                         history.weather_report = item
@@ -180,14 +180,13 @@ class DatabaseManager:
                         history.earthquake = item
                     elif isinstance(item, NewsArticle):
                         history.news_article = item
-                    
+
                     session.add(history)
                     session.commit()
                     return True
                 return False
         except SQLAlchemyError as e:
             logger.error(f"Database error marking item as posted: {str(e)}")
-            session.rollback()
             return False
 
     def cleanup_old_records(self, days: int = 7) -> bool:

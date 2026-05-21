@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% block meta %}{% endblock %}
+    <title>{% block title %}CityBot2{% endblock %} - Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="alternate" type="application/rss+xml" title="CityBot2 Feed" href="/feed.xml">
+</head>
+<body>
+    <!-- Flash Messages -->
+    {% if flash_msg %}
+    <div class="flash-{{ flash_cat or 'success' }}">{{ flash_msg }}</div>
+    {% endif %}
+
+    <!-- Mobile Navigation -->
+    <div class="mobile-nav">
+        <a href="/admin/dashboard" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="/weather" class="{% if active_page == 'weather' %}active{% endif %}">Weather</a>
+        <a href="/earthquakes" class="{% if active_page == 'earthquakes' %}active{% endif %}">Earthquakes</a>
+        <a href="/news" class="{% if active_page == 'news' %}active{% endif %}">News</a>
+        <a href="/posts" class="{% if active_page == 'posts' %}active{% endif %}">Posts</a>
+        <a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}">Settings</a>
+    </div>
+
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <h2>CityBot2</h2>
+                <div class="city-name">{{ city.get('name', 'Unknown') }}, {{ city.get('state', '') }}</div>
+                <a href="/feed.xml" style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem; display:inline-block;">RSS Feed</a>
+            </div>
+            <nav>
+                <a href="/admin/dashboard" class="{% if active_page == 'dashboard' %}active{% endif %}">
+                    <span class="icon">&#9632;</span> Dashboard
+                </a>
+                <a href="/weather" class="{% if active_page == 'weather' %}active{% endif %}">
+                    <span class="icon">&#9729;</span> Weather
+                </a>
+                <a href="/earthquakes" class="{% if active_page == 'earthquakes' %}active{% endif %}">
+                    <span class="icon">&#9886;</span> Earthquakes
+                </a>
+                <a href="/news" class="{% if active_page == 'news' %}active{% endif %}">
+                    <span class="icon">&#9993;</span> News
+                </a>
+                <a href="/posts" class="{% if active_page == 'posts' %}active{% endif %}">
+                    <span class="icon">&#10148;</span> Posts
+                </a>
+                <a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}">
+                    <span class="icon">&#9881;</span> Settings
+                </a>
+                <a href="/subscribe" class="{% if active_page == 'subscribe' %}active{% endif %}">
+                    <span class="icon">&#9993;</span> Subscribe
+                </a>
+
+                {% if user %}
+                <div class="divider"></div>
+                <div class="admin-section">
+                    <div class="admin-section-label">Admin</div>
+
+                    {% if has_role(user, 'editor') %}
+                    <a href="/admin/announcements" class="{% if active_page == 'announcements' %}active{% endif %}">
+                        <span class="icon">&#9998;</span> Announcements
+                    </a>
+                    {% endif %}
+
+                    {% if has_role(user, 'admin') %}
+                    <a href="/admin/sources" class="{% if active_page == 'sources' %}active{% endif %}">
+                        <span class="icon">&#9881;</span> Data Sources
+                    </a>
+                    <a href="/admin/queue" class="{% if active_page == 'queue' %}active{% endif %}">
+                        <span class="icon">&#9993;</span> Post Queue
+                    </a>
+                    <a href="/admin/social" class="{% if active_page == 'social' %}active{% endif %}">
+                        <span class="icon">&#9733;</span> Social Accounts
+                    </a>
+                    <a href="/admin/city" class="{% if active_page == 'city_settings' %}active{% endif %}">
+                        <span class="icon">&#9962;</span> City Settings
+                    </a>
+                    <a href="/admin/users" class="{% if active_page == 'users' %}active{% endif %}">
+                        <span class="icon">&#9817;</span> Team
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="divider"></div>
+                {% if user %}
+                <a href="/logout">
+                    <span class="icon">&#10140;</span> Logout ({{ user.display_name or user.email }})
+                </a>
+                {% else %}
+                <a href="/login" class="{% if active_page == 'login' %}active{% endif %}">
+                    <span class="icon">&#10140;</span> Login
+                </a>
+                {% endif %}
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+
+            <div class="page-footer">
+                CityBot2 Dashboard &middot; Last updated: {{ now.strftime('%Y-%m-%d %H:%M UTC') }}
+            </div>
+        </main>
+    </div>
+</body>
+</html>
