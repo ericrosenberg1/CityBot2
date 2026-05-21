@@ -4,7 +4,7 @@ tweepy==4.14.0
 facebook-sdk==3.1.0
 pillow==12.2.0
 praw==7.7.1
-python-linkedin-v2==0.9.4
+python-linkedin-v2==0.9.5
 instabot==0.117.0
 schedule==1.2.1
 folium==0.15.0
