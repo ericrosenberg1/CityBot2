@@ -1,6 +1,6 @@
 aiohttp==3.13.4
 blueskysocial==1.6.2
-tweepy==4.14.0
+tweepy==4.16.0
 facebook-sdk==3.1.0
 pillow==12.2.0
 praw==7.7.1
