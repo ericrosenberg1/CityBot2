@@ -2,32 +2,41 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
 import asyncio
-from datetime import datetime
 
 from .platforms.base import SocialPlatform
 from .platforms.twitter import TwitterPlatform
 from .platforms.bluesky import BlueSkyPlatform
 from .platforms.facebook import FacebookPlatform
 from .platforms.linkedin import LinkedInPlatform
+from .platforms.reddit import RedditPlatform
+from .platforms.threads import ThreadsPlatform
+from .platforms.instagram import InstagramPlatform
+from .platforms.nextdoor import NextdoorPlatform
 from social_media.utils import RateLimiter, ContentValidator, PostContent
-from monitors.earthquake import format_earthquake_for_social
+from social_media.formatters import (
+    format_weather_for_social,
+    format_weather_alert_for_social,
+    format_earthquake_for_social,
+    format_news_for_social,
+    format_announcement_for_social,
+)
 
 if TYPE_CHECKING:
     from monitors.weather import WeatherData, WeatherAlert
 
 logger = logging.getLogger('CityBot2.social.manager')
 
-@dataclass
-class PlatformConfig:
-    """Configuration for a social media platform."""
-    enabled: bool = False
-    post_types: List[str] = field(default_factory=list)
-    credentials: Dict[str, str] = field(default_factory=dict)
-    rate_limits: Dict[str, int] = field(default_factory=lambda: {
-        'posts_per_hour': 10,
-        'posts_per_day': 24,
-        'minimum_interval': 300
-    })
+PLATFORM_CLASSES = {
+    'bluesky': BlueSkyPlatform,
+    'twitter': TwitterPlatform,
+    'facebook': FacebookPlatform,
+    'linkedin': LinkedInPlatform,
+    'reddit': RedditPlatform,
+    'threads': ThreadsPlatform,
+    'instagram': InstagramPlatform,
+    'nextdoor': NextdoorPlatform,
+}
+
 
 @dataclass
 class PostResult:
@@ -36,12 +45,17 @@ class PostResult:
     error: Optional[str] = None
     platform_response: Optional[Dict[str, Any]] = None
 
+
 class SocialMediaManager:
     """Manages posting to multiple social media platforms."""
-    
+
     def __init__(self, config: Dict[str, Any], city_config: Dict[str, Any]):
-        """Initialize the social media manager."""
-        self._validate_config(config, city_config)
+        if 'platforms' not in config:
+            raise ValueError("Configuration must include 'platforms' section")
+        for f in ('name', 'state', 'coordinates'):
+            if f not in city_config:
+                raise ValueError(f"Missing required city config field: {f}")
+
         self.config = config
         self.city_config = city_config
         self.platforms: Dict[str, SocialPlatform] = {}
@@ -50,220 +64,123 @@ class SocialMediaManager:
         self.platform_retries: Dict[str, int] = {}
         self.max_retries = config.get('max_retries', 3)
         self.retry_delay = config.get('retry_delay', 60)
-        
-        self.initialize_platforms()
 
-    def _validate_config(self, config: Dict[str, Any], city_config: Dict[str, Any]) -> None:
-        """Validate the configuration."""
-        if 'platforms' not in config:
-            raise ValueError("Configuration must include 'platforms' section")
-            
-        required_city_fields = ['name', 'state', 'coordinates']
-        missing_fields = [field for field in required_city_fields if field not in city_config]
-        if missing_fields:
-            raise ValueError(f"Missing required city configuration fields: {', '.join(missing_fields)}")
+        self._initialize_platforms()
 
-    def initialize_platforms(self) -> None:
-        """Initialize configured social media platforms."""
-        platform_classes = {
-            'bluesky': BlueSkyPlatform,
-            'twitter': TwitterPlatform,
-            'facebook': FacebookPlatform,
-            'linkedin': LinkedInPlatform,
-        }
+    def _initialize_platforms(self) -> None:
+        """Initialize configured social media platforms.
 
-        for platform_name, platform_class in platform_classes.items():
-            platform_config = self.config['platforms'].get(platform_name, {})
+        Each platform's base class validates its own credentials via
+        CREDENTIAL_MAP — no separate validation dict needed here.
+        """
+        for name, cls in PLATFORM_CLASSES.items():
+            platform_config = self.config['platforms'].get(name, {})
             if not platform_config.get('enabled', False):
                 continue
-
             try:
-                logger.debug("Initializing %s with credentials: %s", 
-                           platform_name, 
-                           list(platform_config.get('credentials', {}).keys()))
-                
-                if platform_name == 'twitter':
-                    # Let TwitterPlatform handle validation
-                    is_valid, error = TwitterPlatform.validate_config(platform_config)
-                    if not is_valid:
-                        logger.error("Invalid Twitter configuration: %s", error)
-                        continue
-                elif not self._validate_platform_config(platform_name, platform_config):
-                    continue
-
-                self.platforms[platform_name] = platform_class(platform_config, self.city_config)
-                self.platform_retries[platform_name] = 0
-                logger.info("Initialized %s platform", platform_name)
-
+                self.platforms[name] = cls(platform_config, self.city_config)
+                self.platform_retries[name] = 0
+                logger.info("Initialized %s platform", name)
             except Exception as e:
-                logger.error("Failed to initialize %s: %s", platform_name, str(e))
+                logger.error("Failed to initialize %s: %s", name, str(e))
 
-    def _validate_platform_config(self, platform: str, config: Dict) -> bool:
-        """Validate platform-specific configuration."""
-        required_credentials = {
-            'bluesky': ['handle', 'password'],
-            'facebook': ['page_id', 'access_token'],
-            'linkedin': ['client_id', 'client_secret', 'access_token'],
-        }
-
-        if platform not in required_credentials:
-            logger.error("Unknown platform: %s", platform)
-            return False
-
-        credentials = config.get('credentials', {})
-        if not credentials:
-            logger.error("No credentials provided for %s", platform)
-            return False
-
-        missing = [cred for cred in required_credentials[platform] if not credentials.get(cred)]
-        if missing:
-            logger.error("Missing credentials for %s: %s", platform, ', '.join(missing))
-            return False
-
-        return True
+    # ── posting pipeline ─────────────────────────────────────────────
 
     async def post_content(self, content: PostContent, post_type: str) -> Dict[str, PostResult]:
         """Post content to all enabled platforms."""
         results: Dict[str, PostResult] = {}
-        tasks = []
+        tasks = {}
 
-        for platform_name, platform in self.platforms.items():
-            can_post, reason = await self._can_post_to_platform(platform_name, post_type)
-            if not can_post:
-                results[platform_name] = PostResult(success=False, error=reason)
+        for name, platform in self.platforms.items():
+            can, reason = await self._can_post(name, post_type)
+            if not can:
+                results[name] = PostResult(success=False, error=reason)
                 continue
-
-            tasks.append(self._post_to_platform_with_retry(platform_name, platform, content))
+            tasks[name] = self._post_with_retry(name, platform, content, post_type)
 
         if tasks:
-            completed_tasks = await asyncio.gather(*tasks, return_exceptions=True)
-            for platform_name, result in zip(self.platforms.keys(), completed_tasks):
+            completed = await asyncio.gather(*tasks.values(), return_exceptions=True)
+            for name, result in zip(tasks.keys(), completed):
                 if isinstance(result, Exception):
-                    results[platform_name] = PostResult(success=False, error=str(result))
+                    results[name] = PostResult(success=False, error=str(result))
                 else:
-                    results[platform_name] = result
-
+                    results[name] = result
         return results
 
-    async def _post_to_platform_with_retry(
-        self,
-        platform_name: str,
-        platform: SocialPlatform,
-        content: PostContent
-    ) -> PostResult:
-        """Attempt to post to a platform with retries."""
+    async def _post_with_retry(self, name, platform, content, post_type) -> PostResult:
         retries = 0
         last_error = None
-
         while retries < self.max_retries:
             try:
-                result = await self._post_to_platform(platform_name, platform, content)
+                result = await self._post_single(name, platform, content, post_type)
                 if result.success:
-                    self.platform_retries[platform_name] = 0
+                    self.platform_retries[name] = 0
                     return result
                 last_error = result.error
             except Exception as e:
                 last_error = str(e)
-                logger.error("Error posting to %s (attempt %d): %s",
-                           platform_name, retries + 1, last_error)
+                logger.error("Error posting to %s (attempt %d): %s", name, retries + 1, last_error)
                 retries += 1
-                self.platform_retries[platform_name] += 1
-
+                self.platform_retries[name] += 1
                 if retries < self.max_retries:
                     await asyncio.sleep(self.retry_delay * (2 ** retries))
                 continue
-
             break
-
         return PostResult(success=False, error=f"Max retries exceeded. Last error: {last_error}")
 
-    async def _post_to_platform(
-        self,
-        platform_name: str,
-        platform: SocialPlatform,
-        content: PostContent
-    ) -> PostResult:
-        """Post content to a specific platform."""
-        try:
-            formatted_content = platform.format_post(content)
-            validation_errors = self.content_validator.validate_content(formatted_content, platform_name)
+    async def _post_single(self, name, platform, content, post_type) -> PostResult:
+        formatted = platform.format_post(content)
+        errors = self.content_validator.validate_content(formatted, name)
+        if errors:
+            return PostResult(success=False, error=f"Validation failed: {', '.join(errors)}")
 
-            if validation_errors:
-                return PostResult(
-                    success=False,
-                    error=f"Content validation failed: {', '.join(validation_errors)}"
-                )
+        success = await platform.post_update(formatted)
+        if success:
+            await self.rate_limiter.record_post(name, post_type, content.text[:100])
+            logger.info("Successfully posted to %s", name)
+            return PostResult(success=True)
+        return PostResult(success=False, error="Platform post update failed")
 
-            success = await platform.post_update(formatted_content)
-            if success:
-                await self.rate_limiter.record_post(platform_name, content.text[:100])
-                logger.info("Successfully posted to %s", platform_name)
-                return PostResult(success=True)
-            
-            return PostResult(success=False, error="Platform post update failed")
-
-        except Exception as e:
-            logger.error("Error posting to %s: %s", platform_name, str(e), exc_info=True)
-            raise
-
-    async def _can_post_to_platform(
-        self,
-        platform_name: str,
-        post_type: str
-    ) -> Tuple[bool, Optional[str]]:
-        """Check if posting is allowed for the platform and type."""
-        platform_config = self.config['platforms'].get(platform_name, {})
-        
-        if not platform_config.get('enabled', False):
+    async def _can_post(self, name: str, post_type: str) -> Tuple[bool, Optional[str]]:
+        cfg = self.config['platforms'].get(name, {})
+        if not cfg.get('enabled', False):
             return False, "Platform not enabled"
-
-        if post_type not in platform_config.get('post_types', []):
-            return False, f"Post type '{post_type}' not enabled for platform"
-
-        if not await self.rate_limiter.can_post(platform_name, post_type):
+        if post_type not in cfg.get('post_types', []):
+            return False, f"Post type '{post_type}' not enabled"
+        if not await self.rate_limiter.can_post(name, post_type):
             return False, "Rate limit exceeded"
-
-        if self.platform_retries[platform_name] >= self.max_retries:
+        if self.platform_retries.get(name, 0) >= self.max_retries:
             return False, "Maximum retry attempts exceeded"
-
         return True, None
 
+    # ── convenience posting methods ──────────────────────────────────
+
+    def _hashtags(self, category: str) -> List[str]:
+        return self.city_config.get('social', {}).get('hashtags', {}).get(category, [])
+
     async def post_weather(self, weather_data: 'WeatherData') -> Dict[str, PostResult]:
-        """Post weather update."""
-        hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('weather', [])
-        content = weather_data.format_for_social(hashtags)
+        content = format_weather_for_social(weather_data, self._hashtags('weather'))
         return await self.post_content(content, 'weather')
 
     async def post_weather_alert(self, alert: 'WeatherAlert') -> Dict[str, PostResult]:
-        """Post weather alert."""
-        hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('weather', [])
-        content = alert.format_for_social(hashtags)
+        content = format_weather_alert_for_social(alert, self._hashtags('weather'))
         return await self.post_content(content, 'weather')
 
     async def post_earthquake(self, quake_data: Dict[str, Any]) -> Dict[str, PostResult]:
-        """Post earthquake update."""
-        hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('earthquake', [])
-        content = format_earthquake_for_social(quake_data, hashtags)
+        content = format_earthquake_for_social(quake_data, self._hashtags('earthquake'))
         return await self.post_content(content, 'earthquake')
 
     async def post_news(self, article: Any) -> Dict[str, PostResult]:
-        """Post news article."""
-        hashtags = self.city_config.get('social', {}).get('hashtags', {}).get('news', [])
-        try:
-            content = article.format_for_social(hashtags)
-        except AttributeError:
-            return await self.post_content(article, 'news')
+        content = format_news_for_social(article, self._hashtags('news'))
         return await self.post_content(content, 'news')
 
+    async def post_announcement(self, announcement: Dict[str, Any]) -> Dict[str, PostResult]:
+        content = format_announcement_for_social(announcement, self._hashtags('news'))
+        return await self.post_content(content, 'announcement')
+
     async def close(self) -> None:
-        """Clean up resources and close connections."""
-        close_tasks = []
-        for platform in self.platforms.values():
-            if hasattr(platform, 'close'):
-                close_tasks.append(platform.close())
-        
+        close_tasks = [p.close() for p in self.platforms.values() if hasattr(p, 'close')]
         if close_tasks:
             await asyncio.gather(*close_tasks, return_exceptions=True)
-        
         await self.rate_limiter.close()
         logger.info("Social media manager shutdown complete")

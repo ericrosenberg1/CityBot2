@@ -12,14 +12,12 @@ import feedparser
 import aiohttp
 from bs4 import BeautifulSoup
 
-from social_media.utils import PostContent, MediaContent
-
 logger = logging.getLogger('CityBot2.news')
 
 
 @dataclass
 class NewsArticleContent:
-    """Structured news content for social media posts."""
+    """Structured news content."""
     title: str
     source: str
     url: str
@@ -28,34 +26,6 @@ class NewsArticleContent:
     relevance_score: float
     location_data: Optional[Dict[str, Any]] = None
     map_path: Optional[str] = None
-
-    def format_for_social(self, hashtags: List[str]) -> PostContent:
-        """Format news article for social media posting."""
-        try:
-            hashtag_text = ' '.join(f"#{tag}" for tag in hashtags)
-            text = (
-                f"📰 {self.title}\n\n"
-                f"{self.content_snippet}\n\n"
-                f"Source: {self.source}\n"
-                f"{self.url}\n\n"
-                f"{hashtag_text}"
-            )
-
-            return PostContent(
-                text=text,
-                media=MediaContent(
-                    image_path=self.map_path,
-                    link_url=self.url,
-                    meta_title=self.title,
-                    meta_description=self.content_snippet[:200]
-                )
-            )
-        except (ValueError, OSError) as exc:
-            logger.error("Error formatting news content: %s", exc, exc_info=True)
-            raise
-        except (TypeError, AttributeError) as exc:
-            logger.error("Error formatting news content: %s", exc, exc_info=True)
-            raise
 
 
 class NewsMonitor:
@@ -68,6 +38,7 @@ class NewsMonitor:
         self.location_keywords = city_config['news']['location_keywords']
         self.cache_dir = Path("cache/maps")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self._seen_urls: set = set()
 
     def _extract_location_data(self, text: str) -> Optional[Dict[str, Any]]:
         """Extract location information from article text."""
@@ -172,16 +143,21 @@ class NewsMonitor:
                 logger.info("Fetched feed from %s, entries: %d",
                             source, entry_count)
 
-                for entry in feed.entries:
+                for entry in feed.entries[:50]:
+                    url = getattr(entry, 'link', None)
+                    if not url or url in self._seen_urls:
+                        continue
+
                     content = entry.get('summary', '')
 
                     if feed_info['priority'] == 1:
-                        additional_content = await self.extract_article_content(entry.link)
+                        additional_content = await self.extract_article_content(url)
                         content = f"{content} {additional_content}"
 
                     score = self.calculate_relevance_score(entry.title, content)
 
                     if score >= min_relevance:
+                        self._seen_urls.add(url)
                         combined_text = f"{entry.title} {content}"
                         location_data = self._extract_location_data(combined_text)
 
@@ -189,7 +165,7 @@ class NewsMonitor:
                         article = NewsArticleContent(
                             title=entry.title,
                             source=source,
-                            url=entry.link,
+                            url=url,
                             content_snippet=snippet,
                             published_date=self.parse_date(entry),
                             relevance_score=score,

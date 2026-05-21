@@ -1,16 +1,26 @@
+# CityBot2 systemd unit (for non-Docker installs)
+# The install.sh script generates this automatically with correct paths.
+# This file is a reference copy.
+
 [Unit]
-Description=CityBot2 Social Media Bot
+Description=CityBot2 - Local Community News & Social Media
 After=network.target
-Wants=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/CityBot2
-Environment=PATH=/home/pi/CityBot2/venv/bin
-ExecStart=/home/pi/CityBot2/venv/bin/python main.py
-Restart=always
+User=citybot
+WorkingDirectory=/opt/citybot2
+ExecStart=/opt/citybot2/venv/bin/python -m citybot
+Restart=on-failure
 RestartSec=5
+Environment=CITYBOT_PORT=8080
+Environment=CITYBOT_MODE=all
+Environment=TZ=America/Los_Angeles
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/citybot2/data /opt/citybot2/logs /opt/citybot2/cache /opt/citybot2/config
 
 [Install]
 WantedBy=multi-user.target

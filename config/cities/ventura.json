@@ -81,6 +81,16 @@
                 "url": "https://www.edhat.com/rss.xml",
                 "priority": 2,
                 "update_frequency": 3600
+            },
+            "City of Ventura Agendas": {
+                "url": "https://cityofventura.granicus.com/ViewPublisherRSS.php?view_id=2&mode=agendas",
+                "priority": 1,
+                "update_frequency": 1800
+            },
+            "City of Ventura Official Meeting Video": {
+                "url": "https://cityofventura.granicus.com/VPodcast.php?view_id=2",
+                "priority": 1,
+                "update_frequency": 1800
             }
         },
         "location_keywords": {

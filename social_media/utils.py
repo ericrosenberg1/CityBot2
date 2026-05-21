@@ -2,18 +2,15 @@
 
 import logging
 import os
-import json
 import sqlite3
 import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from urllib.parse import urlparse
-from pathlib import Path
 
 import aiosqlite
 from PIL import Image
-import folium
 
 logger = logging.getLogger('CityBot2.utils')
 
@@ -129,7 +126,7 @@ class RateLimiter:
                 logger.error("Error checking rate limits: %s", exc, exc_info=True)
                 return False
 
-    async def record_post(self, platform: str, content_preview: str) -> None:
+    async def record_post(self, platform: str, post_type: str, content_preview: str = "") -> None:
         """Record a successful post."""
         async with self.lock:
             try:
@@ -138,7 +135,7 @@ class RateLimiter:
                         INSERT INTO post_history (platform, post_type, content_preview, timestamp)
                         VALUES (?, ?, ?, ?)
                     '''
-                    await db.execute(query, (platform, 'post', content_preview[:100],
+                    await db.execute(query, (platform, post_type, content_preview[:100],
                                              datetime.now().isoformat()))
                     await db.commit()
             except (sqlite3.Error, OSError, ValueError) as exc:
@@ -177,6 +174,10 @@ class ContentValidator:
             'twitter': {'text': 280, 'images': 4},
             'facebook': {'text': 63206, 'images': 10},
             'linkedin': {'text': 3000, 'images': 9},
+            'reddit': {'text': 40000, 'images': 1},
+            'threads': {'text': 500, 'images': 1},
+            'instagram': {'text': 2200, 'images': 1},
+            'nextdoor': {'text': 10000, 'images': 1},
         }
 
         self.image_requirements = {
@@ -203,6 +204,30 @@ class ContentValidator:
                 'min_dimensions': (200, 200),
                 'max_dimensions': (2048, 2048),
                 'allowed_formats': {'JPEG', 'PNG'}
+            },
+            'reddit': {
+                'max_size': 20 * 1024 * 1024,
+                'min_dimensions': (200, 200),
+                'max_dimensions': (4096, 4096),
+                'allowed_formats': {'JPEG', 'PNG', 'GIF'}
+            },
+            'threads': {
+                'max_size': 8 * 1024 * 1024,
+                'min_dimensions': (200, 200),
+                'max_dimensions': (4096, 4096),
+                'allowed_formats': {'JPEG', 'PNG'}
+            },
+            'instagram': {
+                'max_size': 8 * 1024 * 1024,
+                'min_dimensions': (320, 320),
+                'max_dimensions': (4096, 4096),
+                'allowed_formats': {'JPEG', 'PNG'}
+            },
+            'nextdoor': {
+                'max_size': 10 * 1024 * 1024,
+                'min_dimensions': (200, 200),
+                'max_dimensions': (4096, 4096),
+                'allowed_formats': {'JPEG', 'PNG', 'GIF'}
             },
         }
 
@@ -296,68 +321,4 @@ class ContentValidator:
 
 class AsyncCache:
     """Async-compatible cache for temporary data storage."""
-    # ... Unchanged ...
-
-
-class MapGenerator:
-    """Generates various maps (if needed for weather/news)."""
-
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.cache_dir = Path("cache/maps")
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-    async def generate_news_map(self, location_data: Dict[str, Any]) -> Optional[str]:
-        """Generate map for news location."""
-        try:
-            return await asyncio.to_thread(self._create_news_map, location_data)
-        except (OSError, ValueError) as exc:
-            logger.error("Error generating news map: %s", exc, exc_info=True)
-            return None
-        except Exception as exc:
-            logger.error("Error generating news map: %s", exc, exc_info=True)
-            return None
-
-    def _create_news_map(self, location_data: Dict[str, Any]) -> str:
-        """Create news map (runs in thread pool)."""
-        m = folium.Map(
-            location=[self.config['coordinates']['latitude'], self.config['coordinates']['longitude']],
-            zoom_start=12
-        )
-
-        try:
-            folium.Marker(
-                [location_data['latitude'], location_data['longitude']],
-                popup=location_data.get('description', 'News Location'),
-                icon=folium.Icon(color='red')
-            ).add_to(m)
-
-            folium.Marker(
-                [self.config['coordinates']['latitude'], self.config['coordinates']['longitude']],
-                popup=self.config.get('city', 'City Center'),
-                icon=folium.Icon(color='blue')
-            ).add_to(m)
-
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-            html_path = str(self.cache_dir / f"news_map_{timestamp}.html")
-            image_path = html_path.replace('.html', '.png')
-
-            m.save(html_path)
-            cmd = 'cutycapt --url=file://%s --out=%s' % (html_path, image_path)
-            os.system(cmd)
-
-            if os.path.exists(html_path):
-                os.unlink(html_path)
-
-            return image_path
-
-        except (OSError, ValueError) as exc:
-            logger.error("Error creating news map: %s", exc, exc_info=True)
-            if os.path.exists(html_path):
-                os.unlink(html_path)
-            raise
-        except Exception as exc:
-            logger.error("Error creating news map: %s", exc, exc_info=True)
-            if os.path.exists(html_path):
-                os.unlink(html_path)
-            raise
+    pass

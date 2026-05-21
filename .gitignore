@@ -1,3 +1,6 @@
+# OS
+.DS_Store
+
 # Python
 __pycache__/
 *.py[cod]
@@ -42,3 +45,8 @@ backups/
 *.db
 *.sqlite3
 *.pid
+
+# Docker
+.env
+
+# Install artifacts
