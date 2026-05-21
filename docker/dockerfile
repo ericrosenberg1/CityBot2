@@ -1,0 +1,40 @@
+# Use an official Python image
+FROM python:3.10-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-dev \
+    build-essential \
+    libatlas-base-dev \
+    gfortran \
+    libgeos-dev \
+    libproj-dev \
+    proj-data \
+    proj-bin \
+    libcairo2-dev \
+    pkg-config \
+    python3-cartopy \
+    cutycapt \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy project files into the container
+COPY . /app
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create necessary directories
+RUN mkdir -p logs data cache/weather_maps cache/maps config
+
+# Copy the example configuration file
+RUN cp config/credentials.env.example config/credentials.env
+
+# Expose port (if applicable)
+EXPOSE 8000
+
+# Define the command to run the bot
+CMD ["python", "main.py"]
