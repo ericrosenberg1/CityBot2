@@ -26,13 +26,15 @@ jobs:
             GitHub issue. Your job is to diagnose and fix it.
 
             Steps:
-            1. Read the issue body carefully — note the error, culprit, and any URLs.
+            1. Read the issue body carefully — note the error, stack trace, culprit, and any URLs.
             2. Read CLAUDE.md in this repo for project conventions and the test command.
             3. Locate the file(s) mentioned in the culprit or stack trace.
             4. Understand the root cause before changing anything.
             5. Make the minimal change needed to fix the error.
             6. Run the repo's test command (from CLAUDE.md) and confirm it passes.
-            7. Open a draft PR titled "[ai-fix] <brief description>" targeting the default branch.
+            7. Open a PR (NOT a draft) titled "[ai-fix] <brief description>" targeting
+               the default branch. The PR body must include "Fixes #ISSUE_NUMBER" so
+               the issue auto-closes on merge. Keep the PR small — one logical fix.
 
             Hard constraints:
             - Do NOT edit database migration files.
@@ -40,6 +42,4 @@ jobs:
             - Do NOT change public API signatures without noting it prominently in the PR.
             - If the fix requires human judgment (e.g. product logic, multi-file architecture
               changes, or you cannot identify the root cause), leave a comment on the issue
-              explaining what you found and what decision is needed, then close the PR draft
-              with status "needs human review".
-            - Keep the PR small — one logical fix per PR.
+              explaining what you found and what decision is needed, then do NOT open a PR.
