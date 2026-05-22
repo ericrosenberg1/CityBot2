@@ -4,6 +4,10 @@ on:
   issues:
     types: [labeled, opened]
 
+concurrency:
+  group: ai-fix-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   fix:
     if: |
@@ -33,8 +37,8 @@ jobs:
             5. Make the minimal change needed to fix the error.
             6. Run the repo's test command (from CLAUDE.md) and confirm it passes.
             7. Open a PR (NOT a draft) titled "[ai-fix] <brief description>" targeting
-               the default branch. The PR body must include "Fixes #ISSUE_NUMBER" so
-               the issue auto-closes on merge. Keep the PR small — one logical fix.
+               the default branch. The PR body MUST include "Fixes #ISSUE_NUMBER" (using
+               the actual issue number) so the issue auto-closes on merge.
 
             Hard constraints:
             - Do NOT edit database migration files.
@@ -43,3 +47,4 @@ jobs:
             - If the fix requires human judgment (e.g. product logic, multi-file architecture
               changes, or you cannot identify the root cause), leave a comment on the issue
               explaining what you found and what decision is needed, then do NOT open a PR.
+            - Keep the PR small — one logical fix per PR.

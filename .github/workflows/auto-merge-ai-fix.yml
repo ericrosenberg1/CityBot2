@@ -17,11 +17,13 @@ jobs:
       issues: write
     steps:
       - uses: actions/github-script@v7
+        env:
+          SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}
         with:
           script: |
             const headSha = context.payload.workflow_run.head_sha;
 
-            // Find open PRs whose head matches this CI run
+            // Find open non-draft [ai-fix] PRs for this CI run
             const allPrs = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -48,27 +50,56 @@ jobs:
                 pull_number: aiFixPr.number,
                 merge_method: 'squash',
                 commit_title: `${aiFixPr.title} (#${aiFixPr.number})`,
-                commit_message: 'Auto-merged by auto-merge-ai-fix workflow after CI passed.',
+                commit_message: 'Auto-merged after CI passed.',
               });
               console.log(`Merged PR #${aiFixPr.number}`);
-
-              // Comment on the triggering issue so it auto-closes
-              const fixesMatch = aiFixPr.body?.match(/(?:Fixes|Closes|Resolves)\s+#(\d+)/i);
-              if (fixesMatch) {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: parseInt(fixesMatch[1]),
-                  body: `✅ Fix merged automatically via PR #${aiFixPr.number} after CI passed.`,
-                });
-              }
             } catch (e) {
-              console.error(`Failed to merge PR #${aiFixPr.number}: ${e.message}`);
-              // Leave a comment on the PR explaining the failure
+              console.error(`Merge failed: ${e.message}`);
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: aiFixPr.number,
                 body: `⚠️ Auto-merge failed: ${e.message}. Please merge manually.`,
               });
+              return;
+            }
+
+            // Find the linked issue number from "Fixes #N" in PR body
+            const fixesMatch = aiFixPr.body?.match(/(?:Fixes|Closes|Resolves)\s+#(\d+)/i);
+            const linkedIssueNum = fixesMatch ? parseInt(fixesMatch[1]) : null;
+
+            if (linkedIssueNum) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: linkedIssueNum,
+                body: `✅ Fix merged automatically via PR #${aiFixPr.number} after CI passed.`,
+              });
+
+              // Resolve the Sentry issue if an ID is embedded in the GitHub issue body
+              const issueData = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: linkedIssueNum,
+              });
+              const sentryMatch = issueData.data.body?.match(/<!--\s*sentry-issue:(\d+)\s*-->/);
+              const sentryIssueId = sentryMatch?.[1];
+              if (sentryIssueId && process.env.SENTRY_API_TOKEN) {
+                const sentryResp = await fetch(
+                  `https://sentry.io/api/0/issues/${sentryIssueId}/`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Authorization': `Bearer ${process.env.SENTRY_API_TOKEN}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: 'resolved' }),
+                  }
+                );
+                if (sentryResp.ok) {
+                  console.log(`Resolved Sentry issue ${sentryIssueId}`);
+                } else {
+                  console.warn(`Sentry resolve failed: ${sentryResp.status}`);
+                }
+              }
             }
