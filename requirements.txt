@@ -1,10 +1,10 @@
 aiohttp==3.13.4
 blueskysocial==2.1.0
-tweepy==4.14.0
+tweepy==4.16.0
 facebook-sdk==3.1.0
 pillow==12.2.0
 praw==7.8.1
-python-linkedin-v2==0.9.4
+python-linkedin-v2==0.9.5
 instabot==0.117.0
 schedule==1.2.1
 folium==0.15.0
