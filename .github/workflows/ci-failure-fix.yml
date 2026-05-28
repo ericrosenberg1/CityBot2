@@ -1,0 +1,61 @@
+name: CI Failure Auto-Fix
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main, master]
+
+jobs:
+  create-fix-issue:
+    if: |
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const sha = run.head_sha.substring(0, 7);
+            const branch = run.head_branch;
+            const runUrl = run.html_url;
+            const commitMsg = run.head_commit?.message?.split('\n')[0] || 'unknown commit';
+
+            // Dedup: skip if an open issue already exists for this SHA
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'ai-fix',
+              state: 'open',
+              per_page: 50,
+            });
+            if (existing.data.some(i => i.title.includes(sha) && i.title.includes('[CI]'))) {
+              console.log('CI failure issue already open for this commit.');
+              return;
+            }
+
+            const body = [
+              `## CI Failure on \`${branch}\``,
+              '',
+              `**Commit:** [\`${sha}\`](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/commit/${run.head_sha})`,
+              `**Message:** ${commitMsg}`,
+              `**Failed run:** ${runUrl}`,
+              '',
+              '### What to do',
+              'Review the failed run logs above to identify the failing test or lint error,',
+              'then apply the minimal fix and push.',
+              '',
+              '---',
+              '_Auto-created by CI Failure Auto-Fix workflow. The `ai-fix` label triggers an autonomous Claude Code fix attempt._',
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[CI] Tests failing on ${branch} @ ${sha}`,
+              body,
+              labels: ['ai-fix'],
+            });
