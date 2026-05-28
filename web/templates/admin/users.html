@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% set active_page = "users" %}
+
+{% block title %}Team{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Team Management</h1>
+    <div class="subtitle">Manage team members and send invitations</div>
+</div>
+
+<!-- Invite Form -->
+<div class="card">
+    <div class="card-header">
+        <h3>Invite New Member</h3>
+    </div>
+    <form method="post" action="/admin/users/invite" style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
+        <div class="form-group" style="flex:1; min-width:200px; margin-bottom:0;">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" required placeholder="user@example.com">
+        </div>
+        <div class="form-group" style="min-width:140px; margin-bottom:0;">
+            <label for="role">Role</label>
+            <select id="role" name="role">
+                <option value="editor">Editor</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <button type="submit" class="btn btn-primary">Send Invite</button>
+        </div>
+    </form>
+</div>
+
+<!-- Users Table -->
+<div class="card">
+    <div class="card-header">
+        <h3>Team Members</h3>
+        <span class="badge badge-muted">{{ users|length }} total</span>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Last Login</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>{{ u.email }}</td>
+                    <td>{{ u.display_name or '--' }}</td>
+                    <td>
+                        {% if u.role == 'superadmin' %}
+                        <span class="badge badge-danger">Superadmin</span>
+                        {% elif u.role == 'admin' %}
+                        <span class="badge badge-warning">Admin</span>
+                        {% else %}
+                        <span class="badge badge-info">Editor</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.invite_token %}
+                        <span class="badge badge-muted">Pending</span>
+                        {% elif u.is_active %}
+                        <span class="badge badge-success">Active</span>
+                        {% else %}
+                        <span class="badge badge-danger">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ u.last_login|fmt_ts if u.last_login else 'Never' }}</td>
+                    <td>
+                        {% if u.id != user.id and u.role != 'superadmin' %}
+                        <form method="post" action="/admin/users/{{ u.id }}/toggle" style="display:inline;">
+                            {% if u.is_active %}
+                            <button type="submit" class="btn btn-sm btn-danger">Deactivate</button>
+                            {% else %}
+                            <button type="submit" class="btn btn-sm btn-primary">Activate</button>
+                            {% endif %}
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

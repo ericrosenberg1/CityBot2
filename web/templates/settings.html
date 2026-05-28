@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% set active_page = "settings" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Settings</h1>
+    <div class="subtitle">Current configuration (read-only)</div>
+</div>
+
+<div class="grid-2">
+    <!-- City Info -->
+    <div class="card">
+        <div class="card-header">
+            <h3>City Configuration</h3>
+        </div>
+        <div class="config-section">
+            <h4>General</h4>
+            <table class="config-table">
+                <tr><td>Name</td><td>{{ city.get('name', '--') }}</td></tr>
+                <tr><td>State</td><td>{{ city.get('state', '--') }}</td></tr>
+                <tr><td>Description</td><td>{{ city.get('description', '--') }}</td></tr>
+                <tr><td>Timezone</td><td>{{ city.get('timezone', '--') }}</td></tr>
+            </table>
+        </div>
+        <div class="config-section">
+            <h4>Coordinates</h4>
+            {% set coords = city.get('coordinates', {}) %}
+            <table class="config-table">
+                <tr><td>Latitude</td><td>{{ coords.get('latitude', '--') }}</td></tr>
+                <tr><td>Longitude</td><td>{{ coords.get('longitude', '--') }}</td></tr>
+                <tr><td>Elevation</td><td>{{ coords.get('elevation', '--') }}m</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Environment Variables -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Environment Variables</h3>
+            <span class="badge badge-warning">Secrets masked</span>
+        </div>
+        {% if env_vars %}
+        <div class="config-section">
+            <table class="config-table">
+                {% for key, val in env_vars.items() %}
+                <tr><td>{{ key }}</td><td>{{ val }}</td></tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div>No credentials.env file found or file is empty</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Weather Config -->
+<div class="card">
+    <div class="card-header">
+        <h3>Weather Settings</h3>
+    </div>
+    {% set wc = city.get('weather', {}) %}
+    <div class="grid-2">
+        <div class="config-section">
+            <h4>Station</h4>
+            <table class="config-table">
+                <tr><td>Radar Station</td><td>{{ wc.get('radar_station', '--') }}</td></tr>
+                <tr><td>Zone Code</td><td>{{ wc.get('zone_code', '--') }}</td></tr>
+                <tr><td>Description</td><td>{{ wc.get('description', '--') }}</td></tr>
+            </table>
+        </div>
+        <div class="config-section">
+            <h4>Update Intervals</h4>
+            {% set ws = wc.get('settings', {}) %}
+            <table class="config-table">
+                <tr><td>Radar Zoom</td><td>{{ ws.get('radar_zoom', '--') }}</td></tr>
+                <tr><td>Update Frequency</td><td>{{ ws.get('update_frequency', '--') }}s</td></tr>
+                <tr><td>Alert Frequency</td><td>{{ ws.get('alert_frequency', '--') }}s</td></tr>
+                <tr><td>Alert Radius</td><td>{{ ws.get('alert_radius_miles', '--') }} mi</td></tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Earthquake Config -->
+<div class="card">
+    <div class="card-header">
+        <h3>Earthquake Settings</h3>
+    </div>
+    {% set es = city.get('earthquake', {}).get('settings', {}) %}
+    <div class="grid-2">
+        <div class="config-section">
+            <h4>Detection</h4>
+            <table class="config-table">
+                <tr><td>Minimum Magnitude</td><td>{{ es.get('minimum_magnitude', '--') }}</td></tr>
+                <tr><td>Radius (miles)</td><td>{{ es.get('radius_miles', '--') }}</td></tr>
+                <tr><td>Update Frequency</td><td>{{ es.get('update_frequency', '--') }}s</td></tr>
+            </table>
+        </div>
+        <div class="config-section">
+            <h4>Significance Thresholds</h4>
+            {% set thresh = es.get('significant_thresholds', {}) %}
+            <table class="config-table">
+                {% for level, vals in thresh.items() %}
+                <tr>
+                    <td style="text-transform:capitalize;">{{ level }}</td>
+                    <td>M{{ vals.get('magnitude', '?') }}+ within {{ vals.get('distance_miles', '?') }} mi</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- News Config -->
+<div class="card">
+    <div class="card-header">
+        <h3>News Settings</h3>
+    </div>
+    {% set nc = city.get('news', {}) %}
+    {% set ns = nc.get('settings', {}) %}
+    <div class="grid-2">
+        <div class="config-section">
+            <h4>General</h4>
+            <table class="config-table">
+                <tr><td>Relevance Threshold</td><td>{{ ns.get('relevance_threshold', '--') }}</td></tr>
+                <tr><td>Max Posts/Day</td><td>{{ ns.get('max_posts_per_day', '--') }}</td></tr>
+                <tr><td>Update Frequency</td><td>{{ ns.get('update_frequency', '--') }}s</td></tr>
+            </table>
+        </div>
+        <div class="config-section">
+            <h4>RSS Feeds</h4>
+            <table class="config-table">
+                {% for name, feed in nc.get('rss_feeds', {}).items() %}
+                <tr>
+                    <td>{{ name }}</td>
+                    <td>Priority {{ feed.get('priority', '?') }} &middot; {{ feed.get('update_frequency', '?') }}s</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+    <div class="config-section" style="margin-top:1rem;">
+        <h4>Location Keywords</h4>
+        {% set kw = nc.get('location_keywords', {}) %}
+        <div style="margin-bottom:0.5rem;">
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">At least one:</span><br>
+            {% for k in kw.get('at_least_one', []) %}
+            <span class="badge badge-info" style="margin:0.15rem 0.1rem;">{{ k }}</span>
+            {% endfor %}
+        </div>
+        {% if kw.get('exclude') %}
+        <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Exclude:</span><br>
+            {% for k in kw.get('exclude', []) %}
+            <span class="badge badge-danger" style="margin:0.15rem 0.1rem;">{{ k }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Social Config -->
+{% if city.get('social') %}
+<div class="card">
+    <div class="card-header">
+        <h3>Social Media Settings</h3>
+    </div>
+    {% set sc = city.get('social', {}) %}
+
+    {% if sc.get('post_settings') %}
+    <div class="config-section">
+        <h4>Post Settings</h4>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Type</th><th>Frequency</th><th>Max Daily</th><th>Include Map</th><th>Alert Override</th></tr>
+                </thead>
+                <tbody>
+                    {% for type, settings in sc.get('post_settings', {}).items() %}
+                    <tr>
+                        <td style="text-transform:capitalize;">{{ type }}</td>
+                        <td>{{ settings.get('frequency', '--') }}s</td>
+                        <td>{{ settings.get('max_daily', '--') }}</td>
+                        <td>{{ 'Yes' if settings.get('include_map') else 'No' }}</td>
+                        <td>{{ 'Yes' if settings.get('alert_override') else 'No' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if sc.get('hashtags') %}
+    <div class="config-section">
+        <h4>Hashtags</h4>
+        {% for category, tags in sc.get('hashtags', {}).items() %}
+        <div style="margin-bottom:0.5rem;">
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">{{ category }}:</span>
+            {% for tag in tags %}
+            <span class="badge badge-primary" style="margin:0.1rem;">#{{ tag }}</span>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Raw JSON -->
+<div class="card">
+    <div class="card-header">
+        <h3>Raw City Configuration</h3>
+    </div>
+    <pre class="json-block">{{ city|tojson(indent=2) }}</pre>
+</div>
+{% endblock %}

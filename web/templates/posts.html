@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% set active_page = "posts" %}
+
+{% block title %}Posts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Post History</h1>
+    <div class="subtitle">Social media posting activity across all platforms</div>
+</div>
+
+<!-- Stats -->
+<div class="grid-4" style="margin-bottom:1.25rem;">
+    <div class="stat-card primary">
+        <div class="stat-value">{{ stats.total_30d }}</div>
+        <div class="stat-label">Total (30d)</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-value">{{ stats.total_24h }}</div>
+        <div class="stat-label">Last 24h</div>
+    </div>
+    <div class="stat-card info">
+        <div class="stat-value">{{ stats.daily_avg }}</div>
+        <div class="stat-label">Daily Average</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-value">{{ stats.by_platform|length }}</div>
+        <div class="stat-label">Platforms</div>
+    </div>
+</div>
+
+<!-- Platform + Type Breakdown -->
+<div class="grid-2" style="margin-bottom:1.25rem;">
+    <div class="card">
+        <div class="card-header">
+            <h3>By Platform</h3>
+        </div>
+        {% if stats.by_platform %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Platform</th><th style="text-align:right;">Posts</th></tr></thead>
+                <tbody>
+                    {% for platform, count in stats.by_platform.items() %}
+                    <tr>
+                        <td style="text-transform:capitalize;">{{ platform }}</td>
+                        <td style="text-align:right; font-weight:600;">{{ count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><div>No platform data</div></div>
+        {% endif %}
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h3>By Content Type</h3>
+        </div>
+        {% if stats.by_type %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Type</th><th style="text-align:right;">Posts</th></tr></thead>
+                <tbody>
+                    {% for type, count in stats.by_type.items() %}
+                    <tr>
+                        <td>{{ type }}</td>
+                        <td style="text-align:right; font-weight:600;">{{ count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><div>No type data</div></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Full Post Log -->
+<div class="card">
+    <div class="card-header">
+        <h3>Post Log</h3>
+        <span class="badge badge-muted">{{ posts|length }} entries</span>
+    </div>
+    {% if posts %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Platform</th>
+                    <th>Type</th>
+                    <th>Preview</th>
+                    <th>Related Item</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for post in posts %}
+                <tr>
+                    <td style="white-space:nowrap;">
+                        {{ post.timestamp|fmt_ts }}<br>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">{{ post.timestamp|fmt_rel }}</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-primary" style="text-transform:capitalize;">{{ post.platform }}</span>
+                    </td>
+                    <td>{{ post.item_type }}</td>
+                    <td class="truncate" style="max-width:200px;">{{ post.content_preview or '--' }}</td>
+                    <td style="font-size:0.8rem; color:var(--text-muted);">
+                        {% if post.weather_report_id %}Weather #{{ post.weather_report_id }}
+                        {% elif post.weather_alert_id %}Alert #{{ post.weather_alert_id }}
+                        {% elif post.earthquake_id %}Quake #{{ post.earthquake_id }}
+                        {% elif post.news_article_id %}News #{{ post.news_article_id }}
+                        {% else %}--{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">&#10148;</div>
+        <div>No posts recorded yet</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

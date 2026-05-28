@@ -2,24 +2,21 @@ import facebook
 import asyncio
 import logging
 from typing import Dict, Any
+
 from .base import SocialPlatform
 from ..utils import PostContent
 
 logger = logging.getLogger(__name__)
 
+
 class FacebookPlatform(SocialPlatform):
     """Facebook platform implementation."""
-    
-    def __init__(self, credentials: Dict[str, Any], city_config: Dict[str, Any]):
-        """
-        Initialize Facebook platform.
-        
-        :param credentials: Dictionary containing authentication credentials
-        :param city_config: Configuration for the city
-        """
-        super().__init__({'credentials': credentials})
-        self.city_config = city_config
-        self._client = None
+
+    CREDENTIAL_MAP = {
+        'page_id': 'FACEBOOK_PAGE_ID',
+        'access_token': 'FACEBOOK_ACCESS_TOKEN',
+    }
+    CHAR_LIMIT = 63206
 
     async def initialize_client(self) -> None:
         """Initialize Facebook client."""
@@ -29,7 +26,7 @@ class FacebookPlatform(SocialPlatform):
                 version="3.1"
             )
         except Exception as e:
-            logger.error(f"Failed to initialize Facebook client: {str(e)}")
+            logger.error("Failed to initialize Facebook client: %s", str(e))
             raise
 
     async def post_update(self, content: PostContent) -> bool:
@@ -38,9 +35,7 @@ class FacebookPlatform(SocialPlatform):
             if not self._client:
                 await self.initialize_client()
 
-            post_args = {
-                'message': content.text
-            }
+            post_args = {'message': content.text}
 
             if content.media:
                 if content.media.image_path:
@@ -58,10 +53,5 @@ class FacebookPlatform(SocialPlatform):
             return bool(result)
 
         except Exception as e:
-            logger.error(f"Error posting to Facebook: {str(e)}")
+            logger.error("Error posting to Facebook: %s", str(e))
             return False
-
-    def format_post(self, content: PostContent) -> PostContent:
-        """Format content for Facebook."""
-        # Facebook has a much higher character limit
-        return content

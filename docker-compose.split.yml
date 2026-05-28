@@ -1,0 +1,77 @@
+# Split-service compose: web and bot as separate containers.
+# Usage: docker compose -f docker-compose.split.yml up -d
+# With domain: CITYBOT_DOMAIN=ventura.news docker compose -f docker-compose.split.yml --profile caddy up -d
+
+services:
+  web:
+    build: .
+    image: citybot2:latest
+    container_name: citybot2-web
+    restart: unless-stopped
+    ports:
+      - "${CITYBOT_PORT:-8080}:8080"
+    volumes:
+      - citybot-data:/app/data
+      - citybot-config:/app/config
+      - citybot-logs:/app/logs
+      - citybot-cache:/app/cache
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CITYBOT_MODE: web
+      CITYBOT_PORT: "8080"
+      CITYBOT_DOMAIN: ${CITYBOT_DOMAIN:-}
+      TZ: ${TZ:-America/Los_Angeles}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  bot:
+    build: .
+    image: citybot2:latest
+    container_name: citybot2-bot
+    restart: unless-stopped
+    volumes:
+      - citybot-data:/app/data
+      - citybot-config:/app/config
+      - citybot-logs:/app/logs
+      - citybot-cache:/app/cache
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CITYBOT_MODE: bot
+      TZ: ${TZ:-America/Los_Angeles}
+    depends_on:
+      web:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: citybot2-caddy
+    restart: unless-stopped
+    profiles: ["caddy"]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      CITYBOT_DOMAIN: ${CITYBOT_DOMAIN:-localhost}
+    depends_on:
+      - web
+
+volumes:
+  citybot-data:
+  citybot-config:
+  citybot-logs:
+  citybot-cache:
+  caddy-data:
+  caddy-config:

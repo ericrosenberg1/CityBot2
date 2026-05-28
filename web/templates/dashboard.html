@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block meta %}
+<meta http-equiv="refresh" content="60">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div>
+            <h1>{{ city.get('name', 'CityBot2') }} Dashboard</h1>
+            <div class="subtitle">{{ city.get('description', 'Real-time monitoring dashboard') }}</div>
+        </div>
+        <div>
+            {% if bot_running %}
+            <span class="status-indicator status-running"><span class="dot"></span> Bot Active</span>
+            {% else %}
+            <span class="status-indicator status-stopped"><span class="dot"></span> Bot Inactive</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Active Alerts Banner -->
+{% if alerts %}
+{% for alert in alerts %}
+<div class="alert-banner">
+    <span class="icon">&#9888;</span>
+    <strong>{{ alert.event }}</strong> &mdash; {{ alert.headline }}
+    <span class="badge badge-danger" style="margin-left:auto;">{{ alert.severity }}</span>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Stats Row -->
+<div class="grid-4" style="margin-bottom:1.25rem;">
+    <div class="stat-card primary">
+        <div class="stat-value">{{ stats.total_30d }}</div>
+        <div class="stat-label">Posts (30d)</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-value">{{ stats.total_24h }}</div>
+        <div class="stat-label">Posts (24h)</div>
+    </div>
+    <div class="stat-card info">
+        <div class="stat-value">{{ stats.daily_avg }}</div>
+        <div class="stat-label">Daily Average</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-value">{{ earthquakes|length }}</div>
+        <div class="stat-label">Quakes (24h)</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Current Weather -->
+    <div class="card">
+        <div class="card-header">
+            <h3>&#9729; Current Weather</h3>
+            {% if weather %}
+            <span class="badge badge-info">{{ weather.timestamp|fmt_rel }}</span>
+            {% endif %}
+        </div>
+        {% if weather %}
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+            <div>
+                <div style="font-size:2.5rem; font-weight:700; color:var(--text-bright);">
+                    {{ weather.temperature|round(0)|int if weather.temperature is not none else '--' }}&deg;F
+                </div>
+                <div style="color:var(--text-muted); font-size:0.85rem;">Temperature</div>
+            </div>
+            <div>
+                <div style="margin-bottom:0.5rem;">
+                    <span style="color:var(--text-muted); font-size:0.8rem;">Wind</span><br>
+                    <span style="font-weight:600;">{{ weather.wind_speed or '--' }} mph {{ weather.wind_direction or '' }}</span>
+                </div>
+                <div>
+                    <span style="color:var(--text-muted); font-size:0.8rem;">Cloud Cover</span><br>
+                    <span style="font-weight:600;">{{ weather.cloud_cover if weather.cloud_cover is not none else '--' }}%</span>
+                </div>
+            </div>
+        </div>
+        {% if weather.forecast %}
+        <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border);">
+            <div class="forecast-text">{{ weather.forecast[:200] }}{% if weather.forecast|length > 200 %}...{% endif %}</div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#9729;</div>
+            <div>No weather data available yet</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Platform Breakdown -->
+    <div class="card">
+        <div class="card-header">
+            <h3>&#10148; Posts by Platform</h3>
+            <span class="badge badge-muted">30 days</span>
+        </div>
+        {% if stats.by_platform %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Platform</th><th style="text-align:right;">Posts</th></tr>
+                </thead>
+                <tbody>
+                    {% for platform, count in stats.by_platform.items() %}
+                    <tr>
+                        <td style="text-transform:capitalize;">{{ platform }}</td>
+                        <td style="text-align:right; font-weight:600;">{{ count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#10148;</div>
+            <div>No posts recorded yet</div>
+        </div>
+        {% endif %}
+
+        {% if stats.by_type %}
+        <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border);">
+            <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">By Type</div>
+            {% for type, count in stats.by_type.items() %}
+            <span class="badge badge-info" style="margin-right:0.4rem; margin-bottom:0.3rem;">{{ type }}: {{ count }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Recent Earthquakes -->
+    <div class="card">
+        <div class="card-header">
+            <h3>&#9886; Recent Earthquakes</h3>
+            <a href="/earthquakes" style="font-size:0.8rem;">View all</a>
+        </div>
+        {% if earthquakes %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Mag</th><th>Location</th><th>Distance</th><th>When</th></tr>
+                </thead>
+                <tbody>
+                    {% for eq in earthquakes %}
+                    <tr>
+                        <td>
+                            <span class="{% if eq.magnitude >= 5.0 %}mag-major{% elif eq.magnitude >= 4.0 %}mag-strong{% elif eq.magnitude >= 3.0 %}mag-moderate{% elif eq.magnitude >= 2.0 %}mag-light{% else %}mag-minor{% endif %}">
+                                {{ eq.magnitude|round(1) if eq.magnitude is not none else '?' }}
+                            </span>
+                        </td>
+                        <td class="truncate">{{ eq.location or 'Unknown' }}</td>
+                        <td>{{ eq.distance|round(1) if eq.distance is not none else '--' }} mi</td>
+                        <td style="white-space:nowrap;">{{ eq.timestamp|fmt_rel }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#9886;</div>
+            <div>No earthquakes in the last 24 hours</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent News -->
+    <div class="card">
+        <div class="card-header">
+            <h3>&#9993; Recent News</h3>
+            <a href="/news" style="font-size:0.8rem;">View all</a>
+        </div>
+        {% if news %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Title</th><th>Source</th><th>Score</th></tr>
+                </thead>
+                <tbody>
+                    {% for article in news %}
+                    <tr>
+                        <td>
+                            <a href="{{ article.url }}" target="_blank" class="truncate" style="display:block; max-width:220px;">{{ article.title or 'Untitled' }}</a>
+                        </td>
+                        <td style="white-space:nowrap;">{{ article.source or '--' }}</td>
+                        <td>
+                            {% if article.relevance_score is not none %}
+                            {% set pct = (article.relevance_score * 100)|round(0)|int %}
+                            <span class="relevance-bar {% if pct >= 70 %}relevance-high{% elif pct >= 40 %}relevance-medium{% else %}relevance-low{% endif %}">
+                                <span class="fill" style="width:{{ pct }}%"></span>
+                            </span>
+                            <span style="font-size:0.75rem;">{{ pct }}%</span>
+                            {% else %}
+                            --
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#9993;</div>
+            <div>No news articles available</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

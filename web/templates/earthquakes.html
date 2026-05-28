@@ -1,0 +1,83 @@
+{% extends "base_public.html" %}
+{% set active_page = "earthquakes" %}
+
+{% block title %}Earthquakes{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Earthquakes</h1>
+    <div class="subtitle">Seismic activity near {{ city.get('name', 'your city') }}</div>
+</div>
+
+<!-- Stats -->
+<div class="grid-3" style="margin-bottom:1.25rem;">
+    <div class="stat-card danger">
+        <div class="stat-value">{{ count_24h }}</div>
+        <div class="stat-label">Last 24 Hours</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-value">{{ max_mag|round(1) if max_mag is not none else '--' }}</div>
+        <div class="stat-label">Max Magnitude (24h)</div>
+    </div>
+    <div class="stat-card info">
+        <div class="stat-value">{{ earthquakes|length }}</div>
+        <div class="stat-label">Total Recorded</div>
+    </div>
+</div>
+
+<!-- Earthquake Table -->
+<div class="card">
+    <div class="card-header">
+        <h3>Earthquake Log</h3>
+    </div>
+    {% if earthquakes %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Magnitude</th>
+                    <th>Location</th>
+                    <th>Depth (km)</th>
+                    <th>Distance (mi)</th>
+                    <th>Time</th>
+                    <th>Posted</th>
+                    <th>Map</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for eq in earthquakes %}
+                <tr>
+                    <td>
+                        <span style="font-size:1.1rem;" class="{% if eq.magnitude is not none and eq.magnitude >= 5.0 %}mag-major{% elif eq.magnitude is not none and eq.magnitude >= 4.0 %}mag-strong{% elif eq.magnitude is not none and eq.magnitude >= 3.0 %}mag-moderate{% elif eq.magnitude is not none and eq.magnitude >= 2.0 %}mag-light{% else %}mag-minor{% endif %}">
+                            {{ eq.magnitude|round(1) if eq.magnitude is not none else '?' }}
+                        </span>
+                    </td>
+                    <td>{{ eq.location or 'Unknown location' }}</td>
+                    <td>{{ eq.depth|round(1) if eq.depth is not none else '--' }}</td>
+                    <td>{{ eq.distance|round(1) if eq.distance is not none else '--' }}</td>
+                    <td style="white-space:nowrap;">
+                        {{ eq.timestamp|fmt_ts }}<br>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">{{ eq.timestamp|fmt_rel }}</span>
+                    </td>
+                    <td>
+                        {% if eq.posted %}<span class="badge badge-success">Yes</span>
+                        {% else %}<span class="badge badge-muted">No</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if eq.location %}
+                        <a href="https://www.google.com/maps/search/{{ eq.location|urlencode }}" target="_blank" style="font-size:0.8rem;">Map</a>
+                        {% else %}--{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">&#9886;</div>
+        <div>No earthquakes recorded</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

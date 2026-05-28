@@ -191,6 +191,50 @@ class ConfigurationManager:
                     'LINKEDIN_CLIENT_SECRET': 'client_secret',
                     'LINKEDIN_ACCESS_TOKEN': 'access_token'
                 }
+            },
+            'reddit': {
+                'required_vars': [
+                    'REDDIT_CLIENT_ID',
+                    'REDDIT_CLIENT_SECRET',
+                    'REDDIT_USERNAME',
+                    'REDDIT_PASSWORD'
+                ],
+                'credentials_map': {
+                    'REDDIT_CLIENT_ID': 'client_id',
+                    'REDDIT_CLIENT_SECRET': 'client_secret',
+                    'REDDIT_USERNAME': 'username',
+                    'REDDIT_PASSWORD': 'password'
+                }
+            },
+            'threads': {
+                'required_vars': [
+                    'THREADS_ACCESS_TOKEN',
+                    'THREADS_USER_ID'
+                ],
+                'credentials_map': {
+                    'THREADS_ACCESS_TOKEN': 'access_token',
+                    'THREADS_USER_ID': 'user_id'
+                }
+            },
+            'instagram': {
+                'required_vars': [
+                    'INSTAGRAM_ACCESS_TOKEN',
+                    'INSTAGRAM_BUSINESS_ACCOUNT_ID'
+                ],
+                'credentials_map': {
+                    'INSTAGRAM_ACCESS_TOKEN': 'access_token',
+                    'INSTAGRAM_BUSINESS_ACCOUNT_ID': 'business_account_id'
+                }
+            },
+            'nextdoor': {
+                'required_vars': [
+                    'NEXTDOOR_ACCESS_TOKEN',
+                    'NEXTDOOR_AGENCY_ID'
+                ],
+                'credentials_map': {
+                    'NEXTDOOR_ACCESS_TOKEN': 'access_token',
+                    'NEXTDOOR_AGENCY_ID': 'agency_id'
+                }
             }
         }
 

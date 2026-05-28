@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% set active_page = "login" %}
+
+{% block title %}Accept Invite{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="card" style="max-width: 450px; margin: 0 auto;">
+        <div class="card-header">
+            <h3>Accept Invitation</h3>
+        </div>
+        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+            You have been invited to join CityBot2{% if invite_email %} as <strong>{{ invite_email }}</strong>{% endif %}.
+        </p>
+
+        {% if error %}
+        <div class="flash-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/invite/{{ invite_token }}">
+            <div class="form-group">
+                <label for="display_name">Display Name</label>
+                <input type="text" id="display_name" name="display_name" placeholder="Your name">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" required minlength="8" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary" style="width:100%;">Create Account</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% block meta %}{% endblock %}
+    <title>{% block title %}{{ city.get('name', 'CityBot2') }}{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="alternate" type="application/rss+xml" title="{{ city.get('name', 'CityBot2') }} Feed" href="{{ base_url }}/feed.xml">
+    {% if base_url and base_url != '/' %}<link rel="canonical" href="{{ base_url }}{{ request.url.path }}">{% endif %}
+</head>
+<body class="public-body">
+    <!-- Flash Messages -->
+    {% if flash_msg %}
+    <div class="flash-{{ flash_cat or 'success' }}">{{ flash_msg }}</div>
+    {% endif %}
+
+    <!-- Public Navigation -->
+    <nav class="public-nav">
+        <div class="public-nav-inner">
+            <a href="/" class="brand">{{ city.get('name', 'CityBot2') }}</a>
+
+            <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.nav-links').classList.toggle('open');" aria-label="Menu">
+                <span></span><span></span><span></span>
+            </button>
+
+            <div class="nav-links">
+                <a href="/" class="{% if active_page == 'feed' %}active{% endif %}">Home</a>
+                <a href="/weather" class="{% if active_page == 'weather' %}active{% endif %}">Weather</a>
+                <a href="/earthquakes" class="{% if active_page == 'earthquakes' %}active{% endif %}">Earthquakes</a>
+                <a href="/news" class="{% if active_page == 'news' %}active{% endif %}">News</a>
+                <a href="/subscribe" class="{% if active_page == 'subscribe' %}active{% endif %}">Subscribe</a>
+            </div>
+
+            <div class="nav-right">
+                <a href="/feed.xml" class="rss-link" title="RSS Feed">&#9776; RSS</a>
+                {% if user %}
+                <span class="nav-user">{{ user.display_name or user.email }}</span>
+                {% if has_role(user, 'editor') %}
+                <a href="/admin/dashboard" class="nav-admin-link">Admin</a>
+                {% endif %}
+                <a href="/logout">Logout</a>
+                {% else %}
+                <a href="/login">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="public-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="public-footer">
+        <div class="public-footer-inner">
+            Powered by CityBot2 &middot;
+            <a href="/feed.xml">RSS Feed</a> &middot;
+            <a href="/subscribe">Subscribe</a>
+        </div>
+    </footer>
+</body>
+</html>

@@ -128,10 +128,115 @@ class PostHistory(Base):
                 f"item_type='{self.item_type}', "
                 f"timestamp={self.timestamp})>")
 
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=True)
+    display_name = Column(String(100))
+    role = Column(String(20), nullable=False, default='editor')
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
+    invited_by_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    invite_token = Column(String(100), nullable=True, unique=True)
+    invite_expires = Column(DateTime, nullable=True)
+
+
+class SocialAccount(Base):
+    __tablename__ = 'social_accounts'
+    id = Column(Integer, primary_key=True)
+    platform = Column(String(50), nullable=False)
+    account_name = Column(String(255))
+    auth_method = Column(String(20), nullable=False, default='api_key')
+    credentials_json = Column(Text, nullable=False)
+    is_active = Column(Boolean, default=True)
+    connected_by_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    connected_at = Column(DateTime, default=datetime.utcnow)
+    last_used = Column(DateTime, nullable=True)
+
+
+class Announcement(Base):
+    __tablename__ = 'announcements'
+    id = Column(Integer, primary_key=True)
+    title = Column(String(255), nullable=False)
+    body = Column(Text, nullable=False)
+    created_by_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    scheduled_for = Column(DateTime, nullable=True)
+    posted = Column(Boolean, default=False)
+    posted_at = Column(DateTime, nullable=True)
+
+
+class EmailSubscriber(Base):
+    __tablename__ = 'email_subscribers'
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, nullable=False)
+    subscribed_at = Column(DateTime, default=datetime.utcnow)
+    confirmed = Column(Boolean, default=False)
+    confirm_token = Column(String(100), unique=True)
+    unsubscribe_token = Column(String(100), unique=True)
+    preferences = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)
+
+
+class DataSource(Base):
+    __tablename__ = 'data_sources'
+    id = Column(Integer, primary_key=True)
+    source_type = Column(String(50), nullable=False)  # 'rss', 'weather', 'earthquake'
+    name = Column(String(255), nullable=False)
+    url = Column(String(512), nullable=True)
+    is_enabled = Column(Boolean, default=True)
+    priority = Column(Integer, default=2)  # 1=high, 2=normal, 3=low
+    check_interval = Column(Integer, default=1800)
+    config_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    last_checked = Column(DateTime, nullable=True)
+
+
+class KeywordFilter(Base):
+    __tablename__ = 'keyword_filters'
+    id = Column(Integer, primary_key=True)
+    data_source_id = Column(Integer, ForeignKey('data_sources.id', ondelete='CASCADE'), nullable=False)
+    keyword = Column(String(255), nullable=False)
+    filter_type = Column(String(20), nullable=False)  # 'must_include', 'at_least_one', 'exclude'
+    data_source = relationship('DataSource', backref='keyword_filters')
+
+
+class PostQueue(Base):
+    __tablename__ = 'post_queue'
+    id = Column(Integer, primary_key=True)
+    content_type = Column(String(50), nullable=False, index=True)
+    priority = Column(String(20), nullable=False, index=True)  # 'immediate', 'scheduled', 'drip'
+    status = Column(String(20), nullable=False, default='pending', index=True)
+    title = Column(String(500), nullable=True)
+    content_text = Column(Text, nullable=False)
+    content_json = Column(Text, nullable=True)
+    media_path = Column(String(512), nullable=True)
+    link_url = Column(String(512), nullable=True)
+    image_url = Column(String(512), nullable=True)
+    source_name = Column(String(255), nullable=True)
+    scheduled_for = Column(DateTime, nullable=True)
+    earliest_post = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    posted_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=3)
+    is_public = Column(Boolean, default=True)
+    weather_report_id = Column(Integer, ForeignKey('weather_reports.id'), nullable=True)
+    earthquake_id = Column(Integer, ForeignKey('earthquakes.id'), nullable=True)
+    news_article_id = Column(Integer, ForeignKey('news_articles.id'), nullable=True)
+    announcement_id = Column(Integer, ForeignKey('announcements.id'), nullable=True)
+
+
 def create_database(database_url: str):
     """
     Create database engine and session factory.
-    
+
     Args:
         database_url: SQLAlchemy database connection URL
     Returns:
@@ -144,83 +249,4 @@ def create_database(database_url: str):
         return engine, SessionLocal
     except Exception as e:
         logger.error(f"Error creating database: {str(e)}")
-        raise
-
-def cleanup_old_records(session: Session, days: int = 7):
-    """
-    Clean up old records across different tables.
-    
-    Args:
-        session: SQLAlchemy session
-        days: Number of days to keep records
-    """
-    try:
-        cutoff = datetime.utcnow() - timedelta(days=days)
-        
-        # Cleanup WeatherReports
-        deleted_weather = session.query(WeatherReport).filter(
-            WeatherReport.timestamp < cutoff
-        ).delete(synchronize_session=False)
-        
-        # Cleanup WeatherAlerts
-        deleted_alerts = session.query(WeatherAlert).filter(
-            WeatherAlert.timestamp < cutoff
-        ).delete(synchronize_session=False)
-        
-        # Cleanup Earthquakes
-        deleted_earthquakes = session.query(Earthquake).filter(
-            Earthquake.timestamp < cutoff
-        ).delete(synchronize_session=False)
-        
-        # Cleanup NewsArticles
-        deleted_news = session.query(NewsArticle).filter(
-            (NewsArticle.published_date < cutoff) | (NewsArticle.timestamp < cutoff)
-        ).delete(synchronize_session=False)
-        
-        # Cleanup PostHistory
-        deleted_history = session.query(PostHistory).filter(
-            PostHistory.timestamp < cutoff
-        ).delete(synchronize_session=False)
-        
-        session.commit()
-        logger.info(f"Cleaned up records older than {days} days: "
-                   f"Weather Reports: {deleted_weather}, "
-                   f"Weather Alerts: {deleted_alerts}, "
-                   f"Earthquakes: {deleted_earthquakes}, "
-                   f"News Articles: {deleted_news}, "
-                   f"Post History: {deleted_history}")
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error cleaning up old records: {str(e)}")
-
-def record_post(session: Session, platform: str, item_type: str, content_preview: str, related_item):
-    """
-    Record a social media post in the database.
-    
-    Args:
-        session: SQLAlchemy session
-        platform: Social media platform name
-        item_type: Type of item being posted
-        content_preview: Preview of the post content
-        related_item: Related database model instance
-    Returns:
-        Added PostHistory instance
-    """
-    try:
-        post_history = PostHistory(
-            platform=platform,
-            item_type=item_type,
-            content_preview=content_preview[:100] if content_preview else None,
-            weather_report=(related_item if isinstance(related_item, WeatherReport) else None),
-            weather_alert=(related_item if isinstance(related_item, WeatherAlert) else None),
-            earthquake=(related_item if isinstance(related_item, Earthquake) else None),
-            news_article=(related_item if isinstance(related_item, NewsArticle) else None)
-        )
-        session.add(post_history)
-        session.commit()
-        session.refresh(post_history)
-        return post_history
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error recording post history: {str(e)}")
         raise
