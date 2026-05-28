@@ -1,0 +1,105 @@
+name: Auto-merge AI Fix PRs
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+jobs:
+  auto-merge:
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}
+        with:
+          script: |
+            const headSha = context.payload.workflow_run.head_sha;
+
+            // Find open non-draft [ai-fix] PRs for this CI run
+            const allPrs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 50,
+            });
+
+            const aiFixPr = allPrs.data.find(pr =>
+              pr.head.sha === headSha &&
+              pr.title.startsWith('[ai-fix]') &&
+              !pr.draft
+            );
+
+            if (!aiFixPr) {
+              console.log('No non-draft [ai-fix] PR found for this CI run.');
+              return;
+            }
+
+            console.log(`Merging PR #${aiFixPr.number}: ${aiFixPr.title}`);
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: aiFixPr.number,
+                merge_method: 'squash',
+                commit_title: `${aiFixPr.title} (#${aiFixPr.number})`,
+                commit_message: 'Auto-merged after CI passed.',
+              });
+              console.log(`Merged PR #${aiFixPr.number}`);
+            } catch (e) {
+              console.error(`Merge failed: ${e.message}`);
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: aiFixPr.number,
+                body: `⚠️ Auto-merge failed: ${e.message}. Please merge manually.`,
+              });
+              return;
+            }
+
+            // Find the linked issue number from "Fixes #N" in PR body
+            const fixesMatch = aiFixPr.body?.match(/(?:Fixes|Closes|Resolves)\s+#(\d+)/i);
+            const linkedIssueNum = fixesMatch ? parseInt(fixesMatch[1]) : null;
+
+            if (linkedIssueNum) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: linkedIssueNum,
+                body: `✅ Fix merged automatically via PR #${aiFixPr.number} after CI passed.`,
+              });
+
+              // Resolve the Sentry issue if an ID is embedded in the GitHub issue body
+              const issueData = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: linkedIssueNum,
+              });
+              const sentryMatch = issueData.data.body?.match(/<!--\s*sentry-issue:(\d+)\s*-->/);
+              const sentryIssueId = sentryMatch?.[1];
+              if (sentryIssueId && process.env.SENTRY_API_TOKEN) {
+                const sentryResp = await fetch(
+                  `https://sentry.io/api/0/issues/${sentryIssueId}/`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Authorization': `Bearer ${process.env.SENTRY_API_TOKEN}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: 'resolved' }),
+                  }
+                );
+                if (sentryResp.ok) {
+                  console.log(`Resolved Sentry issue ${sentryIssueId}`);
+                } else {
+                  console.warn(`Sentry resolve failed: ${sentryResp.status}`);
+                }
+              }
+            }
