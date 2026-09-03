@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Runs the gates that used to run in GitHub Actions, before the push lands.
+# Emergency bypass: git push --no-verify
+set -euo pipefail
+exec "$(git rev-parse --show-toplevel)/scripts/ci-gates.sh"
