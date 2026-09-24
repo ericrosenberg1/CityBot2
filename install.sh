@@ -132,6 +132,9 @@ ok "Service user"
 python3 -m venv "$DIR/venv"
 "$DIR/venv/bin/pip" install -q --upgrade pip
 "$DIR/venv/bin/pip" install -q -r "$DIR/requirements.txt"
+# blueskysocial hard-pins pillow/opencv-python versions that conflict with the
+# security-patched pillow pin in requirements.txt, so it installs separately.
+"$DIR/venv/bin/pip" install -q --no-deps blueskysocial==2.1.0
 ok "Python environment"
 
 mkdir -p data config/cities logs cache/weather_maps cache/maps

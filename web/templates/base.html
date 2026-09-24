@@ -21,7 +21,7 @@
         <a href="/earthquakes" class="{% if active_page == 'earthquakes' %}active{% endif %}">Earthquakes</a>
         <a href="/news" class="{% if active_page == 'news' %}active{% endif %}">News</a>
         <a href="/posts" class="{% if active_page == 'posts' %}active{% endif %}">Posts</a>
-        <a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}">Settings</a>
+        {% if not user or has_role(user, 'admin') %}<a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}">Settings</a>{% endif %}
     </div>
 
     <div class="layout">
@@ -48,9 +48,11 @@
                 <a href="/posts" class="{% if active_page == 'posts' %}active{% endif %}">
                     <span class="icon">&#10148;</span> Posts
                 </a>
+                {% if not user or has_role(user, 'admin') %}
                 <a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}">
                     <span class="icon">&#9881;</span> Settings
                 </a>
+                {% endif %}
                 <a href="/subscribe" class="{% if active_page == 'subscribe' %}active{% endif %}">
                     <span class="icon">&#9993;</span> Subscribe
                 </a>

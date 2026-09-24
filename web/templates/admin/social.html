@@ -9,6 +9,14 @@
     <div class="subtitle">Connect and manage social media platforms</div>
 </div>
 
+<div class="flash-error" style="margin-bottom:1.5rem;">
+    <strong>Heads up:</strong> the bot posts using credentials from
+    <code>config/credentials.env</code>, not the values saved here. Anything you connect on
+    this page is stored (encrypted) for reference only and won't change what the bot
+    actually posts to until that's set in <code>credentials.env</code> and the bot is
+    restarted.
+</div>
+
 <div class="platform-grid">
     {% for platform, fields in platform_fields.items() %}
     <div class="platform-card">
