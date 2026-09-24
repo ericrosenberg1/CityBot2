@@ -1,3 +1,4 @@
+import asyncio
 import tweepy
 import logging
 from typing import Dict, Any, Optional, Tuple
@@ -68,14 +69,20 @@ class TwitterPlatform(SocialPlatform):
             media_ids = []
             if content.media and content.media.image_path:
                 try:
-                    upload = self._api.media_upload(filename=content.media.image_path)
+                    upload = await asyncio.to_thread(
+                        self._api.media_upload, filename=content.media.image_path
+                    )
                     media_ids.append(upload.media_id)
                     logger.info("Successfully uploaded media to Twitter")
                 except Exception as media_err:
                     logger.error("Error uploading media to X: %s", str(media_err), exc_info=True)
                     return False
 
-            tweet_response = self._client.create_tweet(
+            # tweepy.Client is synchronous (uses requests under the hood) and can
+            # sleep the whole thread when wait_on_rate_limit kicks in, so run it
+            # off the event loop like every other blocking platform client here.
+            tweet_response = await asyncio.to_thread(
+                self._client.create_tweet,
                 text=content.text,
                 media_ids=media_ids if media_ids else None
             )
