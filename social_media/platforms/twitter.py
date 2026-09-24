@@ -1,10 +1,11 @@
 import asyncio
-import tweepy
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Any, ClassVar
 
+import tweepy
+
+from ..utils import PostContent
 from .base import SocialPlatform
-from ..utils import PostContent, MediaContent
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 class TwitterPlatform(SocialPlatform):
     """X.com (Twitter) platform implementation."""
 
-    CREDENTIAL_MAP = {
+    CREDENTIAL_MAP: ClassVar[dict[str, str]] = {
         'api_key': 'TWITTER_API_KEY',
         'api_secret': 'TWITTER_API_SECRET',
         'access_token': 'TWITTER_ACCESS_TOKEN',
@@ -20,12 +21,12 @@ class TwitterPlatform(SocialPlatform):
     }
     CHAR_LIMIT = 280
 
-    def __init__(self, platform_config: Dict[str, Any], city_config: Dict[str, Any]):
+    def __init__(self, platform_config: dict[str, Any], city_config: dict[str, Any]):
         super().__init__(platform_config, city_config)
         self._api = None
 
     @staticmethod
-    def validate_config(config: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def validate_config(config: dict[str, Any]) -> tuple[bool, str | None]:
         """Validate Twitter platform configuration."""
         required_fields = ['api_key', 'api_secret', 'access_token', 'access_secret']
         credentials = config.get('credentials', {})
@@ -56,8 +57,8 @@ class TwitterPlatform(SocialPlatform):
                 wait_on_rate_limit=True
             )
             logger.info("Successfully initialized Twitter client")
-        except Exception as e:
-            logger.error("Failed to initialize Twitter client: %s", str(e), exc_info=True)
+        except Exception:
+            logger.exception("Failed to initialize Twitter client")
             raise
 
     async def post_update(self, content: PostContent) -> bool:
@@ -74,8 +75,8 @@ class TwitterPlatform(SocialPlatform):
                     )
                     media_ids.append(upload.media_id)
                     logger.info("Successfully uploaded media to Twitter")
-                except Exception as media_err:
-                    logger.error("Error uploading media to X: %s", str(media_err), exc_info=True)
+                except Exception:
+                    logger.exception("Error uploading media to X")
                     return False
 
             # tweepy.Client is synchronous (uses requests under the hood) and can
@@ -94,6 +95,6 @@ class TwitterPlatform(SocialPlatform):
                 logger.error("Unexpected response when creating tweet")
                 return False
 
-        except Exception as e:
-            logger.error("Error posting to X: %s", str(e), exc_info=True)
+        except Exception:
+            logger.exception("Error posting to X")
             return False

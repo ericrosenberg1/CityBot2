@@ -1,37 +1,61 @@
 """CityBot2 Web Dashboard - FastAPI application."""
 
-import os
-import sys
+import asyncio
 import json
-import secrets
 import logging
+import os
+import secrets
+import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Any
 
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, inspect as sa_inspect
+from sqlalchemy import func
+from sqlalchemy import inspect as sa_inspect
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from database.operations import DatabaseManager
 from database.models import (
-    WeatherReport, WeatherAlert, Earthquake, NewsArticle, PostHistory,
-    User, SocialAccount, Announcement, EmailSubscriber,
-    DataSource, KeywordFilter, PostQueue,
+    Announcement,
+    DataSource,
+    Earthquake,
+    EmailSubscriber,
+    KeywordFilter,
+    NewsArticle,
+    PostHistory,
+    PostQueue,
+    SocialAccount,
+    User,
+    WeatherAlert,
+    WeatherReport,
 )
+from database.operations import DatabaseManager
 from web.auth import (
-    hash_password, verify_password, create_session_token,
-    validate_session_token, SESSION_COOKIE, generate_invite_token,
-    has_role, encrypt_secret,
+    SESSION_COOKIE,
+    create_session_token,
+    encrypt_secret,
+    generate_invite_token,
+    has_role,
+    hash_password,
+    validate_session_token,
+    verify_password,
 )
 
 logger = logging.getLogger("CityBot2.web")
+
+
+def _utcnow() -> datetime:
+    """Current UTC time as a naive datetime (matches what SQLite/SQLAlchemy
+    DateTime columns store here, and what every existing comparison in this
+    file assumes). datetime.utcnow() is deprecated; this is the same value
+    via the non-deprecated call."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 # ─── Login rate limiting ────────────────────────────────────────────────────
 # Simple in-memory sliding-window limiter: this is a single-process admin
@@ -39,7 +63,7 @@ logger = logging.getLogger("CityBot2.web")
 # stop brute-force password guessing against /login. Keyed by client IP.
 LOGIN_MAX_ATTEMPTS = 8
 LOGIN_WINDOW_SECONDS = 900  # 15 minutes
-_login_attempts: Dict[str, list] = {}
+_login_attempts: dict[str, list] = {}
 
 app = FastAPI(title="CityBot2", docs_url=None, redoc_url=None)
 
@@ -52,7 +76,7 @@ app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="stati
 templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
 
 # Database manager (lazy init)
-_db: Optional[DatabaseManager] = None
+_db: DatabaseManager | None = None
 
 
 def get_db() -> DatabaseManager:
@@ -66,7 +90,7 @@ def get_db() -> DatabaseManager:
     return _db
 
 
-def load_city_config_safe() -> Dict[str, Any]:
+def load_city_config_safe() -> dict[str, Any]:
     """Load city config without raising on missing env vars."""
     try:
         city_name = os.getenv("CITY_NAME")
@@ -87,22 +111,22 @@ def load_city_config_safe() -> Dict[str, Any]:
 
         with open(config_path, encoding="utf-8") as f:
             return json.load(f)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - never let a bad config file 500 the homepage
         return {"name": "Error", "state": "", "_error": str(e)}
 
 
-def fmt_timestamp(dt: Optional[datetime]) -> str:
+def fmt_timestamp(dt: datetime | None) -> str:
     """Format a datetime for display."""
     if dt is None:
         return "N/A"
     return dt.strftime("%b %d, %Y %I:%M %p")
 
 
-def fmt_relative(dt: Optional[datetime]) -> str:
+def fmt_relative(dt: datetime | None) -> str:
     """Format a datetime as relative time."""
     if dt is None:
         return "N/A"
-    now = datetime.utcnow()
+    now = _utcnow()
     diff = now - dt
     seconds = int(diff.total_seconds())
     if seconds < 60:
@@ -162,7 +186,7 @@ def _client_ip(request: Request) -> str:
 
 def _login_rate_limited(ip: str) -> bool:
     """Return True if this IP has exceeded the login attempt limit."""
-    now = datetime.utcnow().timestamp()
+    now = _utcnow().timestamp()
     attempts = [t for t in _login_attempts.get(ip, []) if now - t < LOGIN_WINDOW_SECONDS]
     _login_attempts[ip] = attempts
     return len(attempts) >= LOGIN_MAX_ATTEMPTS
@@ -170,7 +194,7 @@ def _login_rate_limited(ip: str) -> bool:
 
 def _record_login_attempt(ip: str) -> None:
     """Record a failed login attempt for this IP."""
-    now = datetime.utcnow().timestamp()
+    now = _utcnow().timestamp()
     _login_attempts.setdefault(ip, []).append(now)
 
 
@@ -229,7 +253,7 @@ def _base_context(request: Request, **kwargs):
         "has_role": has_role,
         "flash_msg": flash_msg,
         "flash_cat": flash_cat,
-        "now": datetime.utcnow(),
+        "now": _utcnow(),
         "base_url": get_base_url(request),
     }
     ctx.update(kwargs)
@@ -243,12 +267,26 @@ def _clear_flash(response):
     return response
 
 
+def _load_json_file(path: Path) -> dict:
+    """Blocking JSON file read, meant to be run via asyncio.to_thread."""
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _save_json_file(path: Path, data: dict) -> None:
+    """Blocking JSON file write, meant to be run via asyncio.to_thread."""
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
 def _table_exists(session, table_name: str) -> bool:
     """Check if a table exists in the database."""
     try:
         inspector = sa_inspect(session.bind)
         return table_name in inspector.get_table_names()
-    except Exception:
+    except Exception:  # noqa: BLE001 - treat any inspection failure as "table missing"
         return False
 
 
@@ -279,15 +317,15 @@ async def feed_page(request: Request):
         try:
             alerts = (
                 session.query(WeatherAlert)
-                .filter(WeatherAlert.expires > datetime.utcnow())
+                .filter(WeatherAlert.expires > _utcnow())
                 .order_by(WeatherAlert.severity.desc())
                 .all()
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - alerts are optional, never break the feed page
             alerts = []
 
         # Recent earthquakes for sidebar
-        eq_cutoff = datetime.utcnow() - timedelta(hours=24)
+        eq_cutoff = _utcnow() - timedelta(hours=24)
         recent_earthquakes = (
             session.query(Earthquake)
             .filter(Earthquake.timestamp >= eq_cutoff)
@@ -307,13 +345,12 @@ async def feed_page(request: Request):
                     q = q.filter(PostQueue.content_type == current_type)
                 q = q.order_by(PostQueue.posted_at.desc())
 
-                total = q.count()
                 feed_items = q.offset((page - 1) * per_page).limit(per_page + 1).all()
 
                 if len(feed_items) > per_page:
                     has_more = True
                     feed_items = feed_items[:per_page]
-            except Exception:
+            except Exception:  # noqa: BLE001 - queue read is best-effort on the public feed
                 feed_items = []
 
     ctx = _base_context(
@@ -344,7 +381,7 @@ async def weather_page(request: Request):
         )
         active_alerts = (
             session.query(WeatherAlert)
-            .filter(WeatherAlert.expires > datetime.utcnow())
+            .filter(WeatherAlert.expires > _utcnow())
             .order_by(WeatherAlert.onset.desc())
             .all()
         )
@@ -377,7 +414,7 @@ async def earthquakes_page(request: Request):
             .limit(100)
             .all()
         )
-        eq_24h = datetime.utcnow() - timedelta(hours=24)
+        eq_24h = _utcnow() - timedelta(hours=24)
         count_24h = (
             session.query(func.count(Earthquake.id))
             .filter(Earthquake.timestamp >= eq_24h)
@@ -440,17 +477,8 @@ async def posts_page(request: Request):
     return _clear_flash(resp)
 
 
-@app.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request):
-    """View current configuration (read-only). Admin-only: this page shows
-    infra config and partially-redacted credential values, which editor-role
-    accounts shouldn't be able to read."""
-    user = require_login(request)
-    if not has_role(user, "admin"):
-        return RedirectResponse("/login", status_code=303)
-
-    city_config = load_city_config_safe()
-    env_path = PROJECT_ROOT / "config" / "credentials.env"
+def _read_redacted_env_vars(env_path: Path) -> dict[str, str]:
+    """Read config/credentials.env, redacting anything secret-looking."""
     env_vars = {}
     if env_path.exists():
         with open(env_path) as f:
@@ -464,6 +492,20 @@ async def settings_page(request: Request):
                         env_vars[key] = "****" + val[-4:] if len(val) > 4 else "****"
                     else:
                         env_vars[key] = val
+    return env_vars
+
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    """View current configuration (read-only). Admin-only: this page shows
+    infra config and partially-redacted credential values, which editor-role
+    accounts shouldn't be able to read."""
+    user = require_login(request)
+    if not has_role(user, "admin"):
+        return RedirectResponse("/login", status_code=303)
+
+    env_path = PROJECT_ROOT / "config" / "credentials.env"
+    env_vars = await asyncio.to_thread(_read_redacted_env_vars, env_path)
 
     ctx = _base_context(request, env_vars=env_vars)
     resp = templates.TemplateResponse(request, "settings.html", ctx)
@@ -577,7 +619,7 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
     with db.Session() as session:
         u = session.query(User).filter_by(email=email).first()
         if u and u.is_active and u.password_hash and verify_password(password, u.password_hash):
-            u.last_login = datetime.utcnow()
+            u.last_login = _utcnow()
             session.commit()
             _clear_login_attempts(ip)
             token = create_session_token(u.id)
@@ -649,7 +691,7 @@ async def invite_page(request: Request, token: str):
     db = get_db()
     with db.Session() as session:
         u = session.query(User).filter_by(invite_token=token).first()
-        if not u or (u.invite_expires and u.invite_expires < datetime.utcnow()):
+        if not u or (u.invite_expires and u.invite_expires < _utcnow()):
             ctx = _base_context(request, error="Invalid or expired invite link")
             return templates.TemplateResponse(request, "login.html", ctx)
     ctx = _base_context(request, invite_token=token, invite_email=u.email)
@@ -677,7 +719,7 @@ async def invite_submit(
     db = get_db()
     with db.Session() as session:
         u = session.query(User).filter_by(invite_token=token).first()
-        if not u or (u.invite_expires and u.invite_expires < datetime.utcnow()):
+        if not u or (u.invite_expires and u.invite_expires < _utcnow()):
             ctx = _base_context(request, error="Invalid or expired invite link")
             return templates.TemplateResponse(request, "login.html", ctx)
         u.password_hash = hash_password(password)
@@ -718,11 +760,11 @@ async def admin_dashboard(request: Request):
         )
         active_alerts = (
             session.query(WeatherAlert)
-            .filter(WeatherAlert.expires > datetime.utcnow())
+            .filter(WeatherAlert.expires > _utcnow())
             .order_by(WeatherAlert.severity.desc())
             .all()
         )
-        eq_cutoff = datetime.utcnow() - timedelta(hours=24)
+        eq_cutoff = _utcnow() - timedelta(hours=24)
         recent_earthquakes = (
             session.query(Earthquake)
             .filter(Earthquake.timestamp >= eq_cutoff)
@@ -737,7 +779,7 @@ async def admin_dashboard(request: Request):
             .all()
         )
         stats = _get_posting_stats(session)
-        status_cutoff = datetime.utcnow() - timedelta(hours=7)
+        status_cutoff = _utcnow() - timedelta(hours=7)
         recent_activity = (
             session.query(func.count(PostHistory.id))
             .filter(PostHistory.timestamp >= status_cutoff)
@@ -803,10 +845,7 @@ async def admin_city_save(
                 slug = configs[0].stem
 
     config_path = PROJECT_ROOT / "config" / "cities" / f"{slug}.json"
-    existing = {}
-    if config_path.exists():
-        with open(config_path, encoding="utf-8") as f:
-            existing = json.load(f)
+    existing = await asyncio.to_thread(_load_json_file, config_path)
 
     existing["name"] = city_name
     existing["state"] = state
@@ -824,8 +863,7 @@ async def admin_city_save(
     existing["weather"]["zone"] = weather_zone
     existing["weather"]["radar_station"] = radar_station
 
-    with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(existing, f, indent=2)
+    await asyncio.to_thread(_save_json_file, config_path, existing)
 
     resp = RedirectResponse("/admin/city", status_code=303)
     _flash(resp, "City settings saved!")
@@ -874,7 +912,7 @@ async def admin_users_invite(
             email=email,
             role=role if role in ("editor", "admin") else "editor",
             invite_token=token,
-            invite_expires=datetime.utcnow() + timedelta(days=7),
+            invite_expires=_utcnow() + timedelta(days=7),
             invited_by_id=user.id,
             is_active=False,
         )
@@ -972,7 +1010,7 @@ async def admin_social_connect(request: Request):
             existing.account_name = account_name
             existing.is_active = True
             existing.connected_by_id = user.id
-            existing.connected_at = datetime.utcnow()
+            existing.connected_at = _utcnow()
         else:
             sa = SocialAccount(
                 platform=platform,
@@ -1244,7 +1282,7 @@ async def admin_queue_page(request: Request):
         )
 
         # Stats
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = _utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         posted_today = (
             session.query(func.count(PostQueue.id))
             .filter(PostQueue.status == 'posted', PostQueue.posted_at >= today_start)
@@ -1252,7 +1290,7 @@ async def admin_queue_page(request: Request):
         )
 
         # Drip rate: posts in last hour
-        hour_ago = datetime.utcnow() - timedelta(hours=1)
+        hour_ago = _utcnow() - timedelta(hours=1)
         drip_rate = (
             session.query(func.count(PostQueue.id))
             .filter(PostQueue.status == 'posted', PostQueue.posted_at >= hour_ago)
@@ -1288,7 +1326,7 @@ async def admin_queue_post_now(request: Request, item_id: int):
         item = session.query(PostQueue).filter_by(id=item_id).first()
         if item and item.status in ('pending', 'failed'):
             item.status = 'posted'
-            item.posted_at = datetime.utcnow()
+            item.posted_at = _utcnow()
             item.error_message = None
             session.commit()
 
@@ -1410,10 +1448,10 @@ async def rss_feed(request: Request):
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 
-def _get_posting_stats(session) -> Dict[str, Any]:
+def _get_posting_stats(session) -> dict[str, Any]:
     """Compute posting statistics."""
-    cutoff_30d = datetime.utcnow() - timedelta(days=30)
-    cutoff_24h = datetime.utcnow() - timedelta(hours=24)
+    cutoff_30d = _utcnow() - timedelta(days=30)
+    cutoff_24h = _utcnow() - timedelta(hours=24)
 
     total = (
         session.query(func.count(PostHistory.id))

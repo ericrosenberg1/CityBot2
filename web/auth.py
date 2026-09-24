@@ -1,12 +1,11 @@
 import base64
 import hashlib
 import secrets
-from datetime import datetime
 from pathlib import Path
+
 import bcrypt
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import Request
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 SECRET_KEY_PATH = Path("data/secret.key")
 

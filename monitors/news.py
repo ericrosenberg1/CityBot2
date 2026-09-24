@@ -1,15 +1,15 @@
 """News monitoring module for CityBot2, handling RSS feeds and relevance scoring."""
 
+import asyncio
 import logging
 import re
-import asyncio
-from datetime import datetime, timezone
-from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
-import feedparser
 import aiohttp
+import feedparser
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger('CityBot2.news')
@@ -24,14 +24,14 @@ class NewsArticleContent:
     content_snippet: str
     published_date: datetime
     relevance_score: float
-    location_data: Optional[Dict[str, Any]] = None
-    map_path: Optional[str] = None
+    location_data: dict[str, Any] | None = None
+    map_path: str | None = None
 
 
 class NewsMonitor:
     """Monitors RSS feeds for local news."""
 
-    def __init__(self, config: Dict[str, Any], city_config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any], city_config: dict[str, Any]):
         self.config = config
         self.city_config = city_config
         self.rss_feeds = city_config['news']['rss_feeds']
@@ -40,7 +40,7 @@ class NewsMonitor:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._seen_urls: set = set()
 
-    def _extract_location_data(self, text: str) -> Optional[Dict[str, Any]]:
+    def _extract_location_data(self, text: str) -> dict[str, Any] | None:
         """Extract location information from article text."""
         location_data = {
             'latitude': self.city_config['coordinates']['latitude'],
@@ -93,30 +93,32 @@ class NewsMonitor:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=10) as response:
-                    if response.status == 200:
-                        html = await response.text()
-                        soup = BeautifulSoup(html, 'html.parser')
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(url, headers=headers, timeout=10) as response,
+            ):
+                if response.status == 200:
+                    html = await response.text()
+                    soup = BeautifulSoup(html, 'html.parser')
 
-                        for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
-                            tag.decompose()
+                    for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
+                        tag.decompose()
 
-                        article = (soup.find('article') or
-                                   soup.find(class_=re.compile(r'article|content|story')))
-                        if article:
-                            text = article.get_text(strip=True)
-                        else:
-                            text = ' '.join(p.get_text(strip=True) for p in soup.find_all('p'))
+                    article = (soup.find('article') or
+                               soup.find(class_=re.compile(r'article|content|story')))
+                    if article:
+                        text = article.get_text(strip=True)
+                    else:
+                        text = ' '.join(p.get_text(strip=True) for p in soup.find_all('p'))
 
-                        return text[:1000]
+                    return text[:1000]
 
-                    logger.warning("Non-200 response (%d) fetching article: %s",
-                                   response.status, url)
-                    return ""
+                logger.warning("Non-200 response (%d) fetching article: %s",
+                               response.status, url)
+                return ""
         except (aiohttp.ClientError, OSError, ValueError, AttributeError,
-                TypeError, asyncio.TimeoutError) as exc:
-            logger.error("Error extracting content from %s: %s", url, exc, exc_info=True)
+                TypeError, asyncio.TimeoutError):
+            logger.exception("Error extracting content from %s", url)
             return ""
 
     def parse_date(self, entry: feedparser.FeedParserDict) -> datetime:
@@ -127,11 +129,11 @@ class NewsMonitor:
             if hasattr(entry, 'updated_parsed') and entry.updated_parsed:
                 return datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
             return datetime.now(timezone.utc)
-        except (ValueError, TypeError, AttributeError) as exc:
-            logger.error("Error parsing date: %s", exc, exc_info=True)
+        except (ValueError, TypeError, AttributeError):
+            logger.exception("Error parsing date")
             return datetime.now(timezone.utc)
 
-    async def check_news(self) -> List[NewsArticleContent]:
+    async def check_news(self) -> list[NewsArticleContent]:
         """Check RSS feeds for relevant news articles."""
         articles = []
         min_relevance = self.config.get('minimum_relevance_score', 0.7)
@@ -180,8 +182,8 @@ class NewsMonitor:
                             location_data=location_data
                         )
                         articles.append(article)
-            except (OSError, ValueError, AttributeError, TypeError, KeyError) as exc:
-                logger.error("Error processing feed %s: %s", source, exc, exc_info=True)
+            except (OSError, ValueError, AttributeError, TypeError, KeyError):
+                logger.exception("Error processing feed %s", source)
 
         articles.sort(key=lambda x: x.published_date, reverse=True)
         logger.info("Total relevant articles found: %d", len(articles))
