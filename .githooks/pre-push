@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Runs the gates that used to run in GitHub Actions, before the push lands.
-# Emergency bypass: git push --no-verify
+# Runs the gates that used to run in GitHub Actions, before the push lands,
+# after infra-leak-guard checks the pushed commits for private infra details.
 set -euo pipefail
-exec "$(git rev-parse --show-toplevel)/scripts/ci-gates.sh"
+top="$(git rev-parse --show-toplevel)"
+"$top/.githooks/infra-leak-guard.sh" --pre-push --remote "${1:-origin}"
+exec "$top/scripts/ci-gates.sh"

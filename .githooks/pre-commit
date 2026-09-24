@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Blocks private infrastructure details from entering a commit in this public repo.
+set -euo pipefail
+exec "$(git rev-parse --show-toplevel)/.githooks/infra-leak-guard.sh" --pre-commit
