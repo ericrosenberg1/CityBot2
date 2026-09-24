@@ -95,7 +95,7 @@ def generate_invite_token():
     return secrets.token_urlsafe(32)
 
 
-ROLE_HIERARCHY = {'superadmin': 3, 'admin': 2, 'editor': 1}
+ROLE_HIERARCHY = {"superadmin": 3, "admin": 2, "editor": 1}
 
 
 def has_role(user, minimum_role):

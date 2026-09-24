@@ -12,12 +12,13 @@ import aiohttp
 import feedparser
 from bs4 import BeautifulSoup
 
-logger = logging.getLogger('CityBot2.news')
+logger = logging.getLogger("CityBot2.news")
 
 
 @dataclass
 class NewsArticleContent:
     """Structured news content."""
+
     title: str
     source: str
     url: str
@@ -34,8 +35,8 @@ class NewsMonitor:
     def __init__(self, config: dict[str, Any], city_config: dict[str, Any]):
         self.config = config
         self.city_config = city_config
-        self.rss_feeds = city_config['news']['rss_feeds']
-        self.location_keywords = city_config['news']['location_keywords']
+        self.rss_feeds = city_config["news"]["rss_feeds"]
+        self.location_keywords = city_config["news"]["location_keywords"]
         self.cache_dir = Path("cache/maps")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._seen_urls: set = set()
@@ -43,14 +44,14 @@ class NewsMonitor:
     def _extract_location_data(self, text: str) -> dict[str, Any] | None:
         """Extract location information from article text."""
         location_data = {
-            'latitude': self.city_config['coordinates']['latitude'],
-            'longitude': self.city_config['coordinates']['longitude'],
-            'description': None
+            "latitude": self.city_config["coordinates"]["latitude"],
+            "longitude": self.city_config["coordinates"]["longitude"],
+            "description": None,
         }
 
-        for location in self.location_keywords['at_least_one']:
+        for location in self.location_keywords["at_least_one"]:
             if location.lower() in text.lower():
-                location_data['description'] = location.title()
+                location_data["description"] = location.title()
                 return location_data
 
         return None
@@ -60,23 +61,26 @@ class NewsMonitor:
         combined_text = f"{title.lower()} {content.lower()}"
         score = 0.0
 
-        if not any(term.lower() in combined_text for term in self.location_keywords['must_include']):
+        if not any(
+            term.lower() in combined_text
+            for term in self.location_keywords["must_include"]
+        ):
             return 0.0
 
-        for term in self.location_keywords['at_least_one']:
+        for term in self.location_keywords["at_least_one"]:
             if term.lower() in combined_text:
                 score += 0.3
                 break
 
-        for term in self.location_keywords['exclude']:
+        for term in self.location_keywords["exclude"]:
             if term.lower() in combined_text:
                 score -= 0.2
 
-        city_name = self.city_config['name'].lower()
+        city_name = self.city_config["name"].lower()
         city_patterns = [
-            fr"\b{city_name} city\b",
-            fr"\bcity of {city_name}\b",
-            fr"\bdowntown {city_name}\b"
+            rf"\b{city_name} city\b",
+            rf"\bcity of {city_name}\b",
+            rf"\bdowntown {city_name}\b",
         ]
         for pattern in city_patterns:
             if re.search(pattern, combined_text):
@@ -88,8 +92,8 @@ class NewsMonitor:
     async def extract_article_content(self, url: str) -> str:
         """Extract article content for relevance checking."""
         headers = {
-            'User-Agent': 'CityBot2/1.0 (News Aggregator)',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            "User-Agent": "CityBot2/1.0 (News Aggregator)",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
 
         try:
@@ -99,34 +103,44 @@ class NewsMonitor:
             ):
                 if response.status == 200:
                     html = await response.text()
-                    soup = BeautifulSoup(html, 'html.parser')
+                    soup = BeautifulSoup(html, "html.parser")
 
-                    for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
+                    for tag in soup(["script", "style", "nav", "header", "footer"]):
                         tag.decompose()
 
-                    article = (soup.find('article') or
-                               soup.find(class_=re.compile(r'article|content|story')))
+                    article = soup.find("article") or soup.find(
+                        class_=re.compile(r"article|content|story")
+                    )
                     if article:
                         text = article.get_text(strip=True)
                     else:
-                        text = ' '.join(p.get_text(strip=True) for p in soup.find_all('p'))
+                        text = " ".join(
+                            p.get_text(strip=True) for p in soup.find_all("p")
+                        )
 
                     return text[:1000]
 
-                logger.warning("Non-200 response (%d) fetching article: %s",
-                               response.status, url)
+                logger.warning(
+                    "Non-200 response (%d) fetching article: %s", response.status, url
+                )
                 return ""
-        except (aiohttp.ClientError, OSError, ValueError, AttributeError,
-                TypeError, asyncio.TimeoutError):
+        except (
+            aiohttp.ClientError,
+            OSError,
+            ValueError,
+            AttributeError,
+            TypeError,
+            asyncio.TimeoutError,
+        ):
             logger.exception("Error extracting content from %s", url)
             return ""
 
     def parse_date(self, entry: feedparser.FeedParserDict) -> datetime:
         """Parse publication date from feed entry."""
         try:
-            if hasattr(entry, 'published_parsed') and entry.published_parsed:
+            if hasattr(entry, "published_parsed") and entry.published_parsed:
                 return datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-            if hasattr(entry, 'updated_parsed') and entry.updated_parsed:
+            if hasattr(entry, "updated_parsed") and entry.updated_parsed:
                 return datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
             return datetime.now(timezone.utc)
         except (ValueError, TypeError, AttributeError):
@@ -136,7 +150,7 @@ class NewsMonitor:
     async def check_news(self) -> list[NewsArticleContent]:
         """Check RSS feeds for relevant news articles."""
         articles = []
-        min_relevance = self.config.get('minimum_relevance_score', 0.7)
+        min_relevance = self.config.get("minimum_relevance_score", 0.7)
 
         for source, feed_info in self.rss_feeds.items():
             try:
@@ -146,21 +160,20 @@ class NewsMonitor:
                 # hanging RSS server. Run it off-thread with a hard timeout,
                 # the same pattern used for the earthquake/weather HTTP calls.
                 feed = await asyncio.wait_for(
-                    asyncio.to_thread(feedparser.parse, feed_info['url']),
+                    asyncio.to_thread(feedparser.parse, feed_info["url"]),
                     timeout=20.0,
                 )
                 entry_count = len(feed.entries)
-                logger.info("Fetched feed from %s, entries: %d",
-                            source, entry_count)
+                logger.info("Fetched feed from %s, entries: %d", source, entry_count)
 
                 for entry in feed.entries[:50]:
-                    url = getattr(entry, 'link', None)
+                    url = getattr(entry, "link", None)
                     if not url or url in self._seen_urls:
                         continue
 
-                    content = entry.get('summary', '')
+                    content = entry.get("summary", "")
 
-                    if feed_info['priority'] == 1:
+                    if feed_info["priority"] == 1:
                         additional_content = await self.extract_article_content(url)
                         content = f"{content} {additional_content}"
 
@@ -179,7 +192,7 @@ class NewsMonitor:
                             content_snippet=snippet,
                             published_date=self.parse_date(entry),
                             relevance_score=score,
-                            location_data=location_data
+                            location_data=location_data,
                         )
                         articles.append(article)
             except (OSError, ValueError, AttributeError, TypeError, KeyError):

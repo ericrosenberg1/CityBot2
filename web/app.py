@@ -57,6 +57,7 @@ def _utcnow() -> datetime:
     via the non-deprecated call."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
+
 # ─── Login rate limiting ────────────────────────────────────────────────────
 # Simple in-memory sliding-window limiter: this is a single-process admin
 # dashboard with no distributed state, so an in-memory dict is sufficient to
@@ -107,7 +108,11 @@ def load_city_config_safe() -> dict[str, Any]:
 
         config_path = PROJECT_ROOT / "config" / "cities" / f"{city_name}.json"
         if not config_path.exists():
-            return {"name": city_name, "state": "", "_error": f"Config file not found: {config_path}"}
+            return {
+                "name": city_name,
+                "state": "",
+                "_error": f"Config file not found: {config_path}",
+            }
 
         with open(config_path, encoding="utf-8") as f:
             return json.load(f)
@@ -148,6 +153,7 @@ templates.env.filters["fmt_rel"] = fmt_relative
 
 # ─── Auth Helpers ──────────────────────────────────────────────────────────────
 
+
 def get_current_user_or_none(request: Request):
     """Return the logged-in User or None."""
     token = request.cookies.get(SESSION_COOKIE)
@@ -187,7 +193,9 @@ def _client_ip(request: Request) -> str:
 def _login_rate_limited(ip: str) -> bool:
     """Return True if this IP has exceeded the login attempt limit."""
     now = _utcnow().timestamp()
-    attempts = [t for t in _login_attempts.get(ip, []) if now - t < LOGIN_WINDOW_SECONDS]
+    attempts = [
+        t for t in _login_attempts.get(ip, []) if now - t < LOGIN_WINDOW_SECONDS
+    ]
     _login_attempts[ip] = attempts
     return len(attempts) >= LOGIN_MAX_ATTEMPTS
 
@@ -214,9 +222,12 @@ def _set_session_cookie(response, token: str, request: Request):
     """Set the session cookie with appropriate secure flags."""
     secure = _is_https(request)
     response.set_cookie(
-        SESSION_COOKIE, token,
-        max_age=86400, httponly=True,
-        secure=secure, samesite="lax",
+        SESSION_COOKIE,
+        token,
+        max_age=86400,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
     )
 
 
@@ -292,6 +303,7 @@ def _table_exists(session, table_name: str) -> bool:
 
 # ─── Public Routes ─────────────────────────────────────────────────────────────
 
+
 @app.get("/", response_class=HTMLResponse)
 async def feed_page(request: Request):
     """Public community news feed homepage."""
@@ -335,10 +347,10 @@ async def feed_page(request: Request):
         )
 
         # Feed items from PostQueue
-        if _table_exists(session, 'post_queue'):
+        if _table_exists(session, "post_queue"):
             try:
                 q = session.query(PostQueue).filter(
-                    PostQueue.status == 'posted',
+                    PostQueue.status == "posted",
                     PostQueue.is_public == True,
                 )
                 if current_type:
@@ -418,7 +430,8 @@ async def earthquakes_page(request: Request):
         count_24h = (
             session.query(func.count(Earthquake.id))
             .filter(Earthquake.timestamp >= eq_24h)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         max_mag = (
             session.query(func.max(Earthquake.magnitude))
@@ -488,7 +501,9 @@ def _read_redacted_env_vars(env_path: Path) -> dict[str, str]:
                     key, val = line.split("=", 1)
                     key = key.strip()
                     val = val.strip()
-                    if any(s in key.lower() for s in ["secret", "password", "token", "key"]):
+                    if any(
+                        s in key.lower() for s in ["secret", "password", "token", "key"]
+                    ):
                         env_vars[key] = "****" + val[-4:] if len(val) > 4 else "****"
                     else:
                         env_vars[key] = val
@@ -513,6 +528,7 @@ async def settings_page(request: Request):
 
 
 # ─── Public: Subscribe ─────────────────────────────────────────────────────────
+
 
 @app.get("/subscribe", response_class=HTMLResponse)
 async def subscribe_page(request: Request):
@@ -555,7 +571,10 @@ async def subscribe_submit(request: Request, email: str = Form(...)):
     # Configure EMAIL_SMTP_HOST/PORT/USER/PASSWORD in credentials.env and add
     # an smtplib/aiosmtplib call here before redirecting.
     resp = RedirectResponse("/subscribe", status_code=303)
-    _flash(resp, f"Please check your email to confirm your subscription. (Email delivery not yet configured — confirmation link: /confirm/{confirm_token})")
+    _flash(
+        resp,
+        f"Please check your email to confirm your subscription. (Email delivery not yet configured — confirmation link: /confirm/{confirm_token})",
+    )
     return resp
 
 
@@ -595,6 +614,7 @@ async def unsubscribe(request: Request, token: str):
 
 # ─── Auth Routes ───────────────────────────────────────────────────────────────
 
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     show_setup = user_count() == 0
@@ -604,7 +624,9 @@ async def login_page(request: Request):
 
 
 @app.post("/login")
-async def login_submit(request: Request, email: str = Form(...), password: str = Form(...)):
+async def login_submit(
+    request: Request, email: str = Form(...), password: str = Form(...)
+):
     ip = _client_ip(request)
     if _login_rate_limited(ip):
         logger.warning("Login rate limit hit for %s", ip)
@@ -618,7 +640,12 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
     db = get_db()
     with db.Session() as session:
         u = session.query(User).filter_by(email=email).first()
-        if u and u.is_active and u.password_hash and verify_password(password, u.password_hash):
+        if (
+            u
+            and u.is_active
+            and u.password_hash
+            and verify_password(password, u.password_hash)
+        ):
             u.last_login = _utcnow()
             session.commit()
             _clear_login_attempts(ip)
@@ -628,7 +655,9 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
             return resp
     # Failed
     _record_login_attempt(ip)
-    ctx = _base_context(request, error="Invalid email or password", show_setup=user_count() == 0)
+    ctx = _base_context(
+        request, error="Invalid email or password", show_setup=user_count() == 0
+    )
     return templates.TemplateResponse(request, "login.html", ctx)
 
 
@@ -710,10 +739,14 @@ async def invite_submit(
         ctx = _base_context(request, invite_token=token, error="Passwords do not match")
         return templates.TemplateResponse(request, "invite.html", ctx)
     if len(password) < 8:
-        ctx = _base_context(request, invite_token=token, error="Password must be at least 8 characters")
+        ctx = _base_context(
+            request, invite_token=token, error="Password must be at least 8 characters"
+        )
         return templates.TemplateResponse(request, "invite.html", ctx)
     if len(password.encode("utf-8")) > 72:
-        ctx = _base_context(request, invite_token=token, error="Password must be 72 characters or fewer")
+        ctx = _base_context(
+            request, invite_token=token, error="Password must be 72 characters or fewer"
+        )
         return templates.TemplateResponse(request, "invite.html", ctx)
 
     db = get_db()
@@ -737,6 +770,7 @@ async def invite_submit(
 
 
 # ─── Admin: Dashboard ─────────────────────────────────────────────────────────
+
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_redirect(request: Request):
@@ -808,6 +842,7 @@ async def admin_dashboard(request: Request):
 
 # ─── Admin: City Settings ─────────────────────────────────────────────────────
 
+
 @app.get("/admin/city", response_class=HTMLResponse)
 async def admin_city_page(request: Request):
     user = require_login(request)
@@ -871,6 +906,7 @@ async def admin_city_save(
 
 
 # ─── Admin: Users ──────────────────────────────────────────────────────────────
+
 
 @app.get("/admin/users", response_class=HTMLResponse)
 async def admin_users_page(request: Request):
@@ -996,7 +1032,9 @@ async def admin_social_connect(request: Request):
     for field in PLATFORM_FIELDS[platform]:
         creds[field] = form.get(field, "")
 
-    account_name = creds.get("handle") or creds.get("username") or creds.get("page_id") or platform
+    account_name = (
+        creds.get("handle") or creds.get("username") or creds.get("page_id") or platform
+    )
     # Credentials are encrypted at rest (Fernet, keyed off data/secret.key) -
     # these are real social-platform passwords/API secrets/tokens, not
     # something that should ever sit in the sqlite file as plain JSON.
@@ -1046,6 +1084,7 @@ async def admin_social_disconnect(request: Request, account_id: int):
 
 # ─── Admin: Announcements ─────────────────────────────────────────────────────
 
+
 @app.get("/admin/announcements", response_class=HTMLResponse)
 async def admin_announcements_page(request: Request):
     user = require_login(request)
@@ -1054,22 +1093,26 @@ async def admin_announcements_page(request: Request):
 
     db = get_db()
     with db.Session() as session:
-        announcements = session.query(Announcement).order_by(Announcement.created_at.desc()).all()
+        announcements = (
+            session.query(Announcement).order_by(Announcement.created_at.desc()).all()
+        )
         ann_list = []
         for a in announcements:
             creator = None
             if a.created_by_id:
                 creator = session.query(User).filter_by(id=a.created_by_id).first()
-            ann_list.append({
-                "id": a.id,
-                "title": a.title,
-                "body": a.body,
-                "created_at": a.created_at,
-                "scheduled_for": a.scheduled_for,
-                "posted": a.posted,
-                "posted_at": a.posted_at,
-                "creator_name": creator.display_name if creator else "Unknown",
-            })
+            ann_list.append(
+                {
+                    "id": a.id,
+                    "title": a.title,
+                    "body": a.body,
+                    "created_at": a.created_at,
+                    "scheduled_for": a.scheduled_for,
+                    "posted": a.posted,
+                    "posted_at": a.posted_at,
+                    "creator_name": creator.display_name if creator else "Unknown",
+                }
+            )
 
     ctx = _base_context(request, announcements=ann_list)
     resp = templates.TemplateResponse(request, "admin/announcements.html", ctx)
@@ -1111,6 +1154,7 @@ async def admin_announcements_create(
 
 
 # ─── Admin: Data Sources ──────────────────────────────────────────────────────
+
 
 @app.get("/admin/sources", response_class=HTMLResponse)
 async def admin_sources_page(request: Request):
@@ -1234,14 +1278,20 @@ async def admin_sources_add_keyword(
 
 
 @app.post("/admin/sources/{source_id}/keywords/{keyword_id}/delete")
-async def admin_sources_delete_keyword(request: Request, source_id: int, keyword_id: int):
+async def admin_sources_delete_keyword(
+    request: Request, source_id: int, keyword_id: int
+):
     user = require_login(request)
     if not has_role(user, "admin"):
         return RedirectResponse("/login", status_code=303)
 
     db = get_db()
     with db.Session() as session:
-        kw = session.query(KeywordFilter).filter_by(id=keyword_id, data_source_id=source_id).first()
+        kw = (
+            session.query(KeywordFilter)
+            .filter_by(id=keyword_id, data_source_id=source_id)
+            .first()
+        )
         if kw:
             session.delete(kw)
             session.commit()
@@ -1253,6 +1303,7 @@ async def admin_sources_delete_keyword(request: Request, source_id: int, keyword
 
 # ─── Admin: Post Queue ────────────────────────────────────────────────────────
 
+
 @app.get("/admin/queue", response_class=HTMLResponse)
 async def admin_queue_page(request: Request):
     user = require_login(request)
@@ -1263,20 +1314,20 @@ async def admin_queue_page(request: Request):
     with db.Session() as session:
         pending_items = (
             session.query(PostQueue)
-            .filter(PostQueue.status == 'pending')
+            .filter(PostQueue.status == "pending")
             .order_by(PostQueue.created_at.desc())
             .all()
         )
         recent_posts = (
             session.query(PostQueue)
-            .filter(PostQueue.status == 'posted')
+            .filter(PostQueue.status == "posted")
             .order_by(PostQueue.posted_at.desc())
             .limit(20)
             .all()
         )
         failed_items = (
             session.query(PostQueue)
-            .filter(PostQueue.status == 'failed')
+            .filter(PostQueue.status == "failed")
             .order_by(PostQueue.created_at.desc())
             .all()
         )
@@ -1285,16 +1336,18 @@ async def admin_queue_page(request: Request):
         today_start = _utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         posted_today = (
             session.query(func.count(PostQueue.id))
-            .filter(PostQueue.status == 'posted', PostQueue.posted_at >= today_start)
-            .scalar() or 0
+            .filter(PostQueue.status == "posted", PostQueue.posted_at >= today_start)
+            .scalar()
+            or 0
         )
 
         # Drip rate: posts in last hour
         hour_ago = _utcnow() - timedelta(hours=1)
         drip_rate = (
             session.query(func.count(PostQueue.id))
-            .filter(PostQueue.status == 'posted', PostQueue.posted_at >= hour_ago)
-            .scalar() or 0
+            .filter(PostQueue.status == "posted", PostQueue.posted_at >= hour_ago)
+            .scalar()
+            or 0
         )
 
     queue_stats = {
@@ -1324,8 +1377,8 @@ async def admin_queue_post_now(request: Request, item_id: int):
     db = get_db()
     with db.Session() as session:
         item = session.query(PostQueue).filter_by(id=item_id).first()
-        if item and item.status in ('pending', 'failed'):
-            item.status = 'posted'
+        if item and item.status in ("pending", "failed"):
+            item.status = "posted"
             item.posted_at = _utcnow()
             item.error_message = None
             session.commit()
@@ -1344,8 +1397,8 @@ async def admin_queue_cancel(request: Request, item_id: int):
     db = get_db()
     with db.Session() as session:
         item = session.query(PostQueue).filter_by(id=item_id).first()
-        if item and item.status == 'pending':
-            item.status = 'cancelled'
+        if item and item.status == "pending":
+            item.status = "cancelled"
             session.commit()
 
     resp = RedirectResponse("/admin/queue", status_code=303)
@@ -1354,6 +1407,7 @@ async def admin_queue_cancel(request: Request, item_id: int):
 
 
 # ─── RSS Feed ──────────────────────────────────────────────────────────────────
+
 
 @app.get("/feed.xml")
 async def rss_feed(request: Request):
@@ -1382,7 +1436,11 @@ async def rss_feed(request: Request):
         for r in reports:
             fe = fg.add_entry()
             fe.id(f"{base_url}/weather#report-{r.id}")
-            fe.title(f"Weather Update: {r.temperature}F" if r.temperature else "Weather Update")
+            fe.title(
+                f"Weather Update: {r.temperature}F"
+                if r.temperature
+                else "Weather Update"
+            )
             fe.description(r.forecast or "No forecast available")
             fe.link(href=f"{base_url}/weather")
             if r.timestamp:
@@ -1399,8 +1457,14 @@ async def rss_feed(request: Request):
         for q in quakes:
             fe = fg.add_entry()
             fe.id(f"{base_url}/earthquakes#eq-{q.id}")
-            fe.title(f"M{q.magnitude} Earthquake - {q.location}" if q.magnitude else "Earthquake")
-            fe.description(f"Magnitude {q.magnitude} at depth {q.depth}km near {q.location}")
+            fe.title(
+                f"M{q.magnitude} Earthquake - {q.location}"
+                if q.magnitude
+                else "Earthquake"
+            )
+            fe.description(
+                f"Magnitude {q.magnitude} at depth {q.depth}km near {q.location}"
+            )
             fe.link(href=f"{base_url}/earthquakes")
             if q.timestamp:
                 fe.published(q.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"))
@@ -1448,6 +1512,7 @@ async def rss_feed(request: Request):
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _get_posting_stats(session) -> dict[str, Any]:
     """Compute posting statistics."""
     cutoff_30d = _utcnow() - timedelta(days=30)
@@ -1456,13 +1521,15 @@ def _get_posting_stats(session) -> dict[str, Any]:
     total = (
         session.query(func.count(PostHistory.id))
         .filter(PostHistory.timestamp >= cutoff_30d)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     total_24h = (
         session.query(func.count(PostHistory.id))
         .filter(PostHistory.timestamp >= cutoff_24h)
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     platform_counts = dict(
@@ -1490,9 +1557,11 @@ def _get_posting_stats(session) -> dict[str, Any]:
 
 # ─── Entry point ───────────────────────────────────────────────────────────────
 
+
 def main():
     """Run the web dashboard."""
     import uvicorn
+
     uvicorn.run(
         "web.app:app",
         host="0.0.0.0",

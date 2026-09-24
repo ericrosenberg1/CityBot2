@@ -14,10 +14,10 @@ class TwitterPlatform(SocialPlatform):
     """X.com (Twitter) platform implementation."""
 
     CREDENTIAL_MAP: ClassVar[dict[str, str]] = {
-        'api_key': 'TWITTER_API_KEY',
-        'api_secret': 'TWITTER_API_SECRET',
-        'access_token': 'TWITTER_ACCESS_TOKEN',
-        'access_secret': 'TWITTER_ACCESS_SECRET',
+        "api_key": "TWITTER_API_KEY",
+        "api_secret": "TWITTER_API_SECRET",
+        "access_token": "TWITTER_ACCESS_TOKEN",
+        "access_secret": "TWITTER_ACCESS_SECRET",
     }
     CHAR_LIMIT = 280
 
@@ -28,8 +28,8 @@ class TwitterPlatform(SocialPlatform):
     @staticmethod
     def validate_config(config: dict[str, Any]) -> tuple[bool, str | None]:
         """Validate Twitter platform configuration."""
-        required_fields = ['api_key', 'api_secret', 'access_token', 'access_secret']
-        credentials = config.get('credentials', {})
+        required_fields = ["api_key", "api_secret", "access_token", "access_secret"]
+        credentials = config.get("credentials", {})
         if not credentials:
             return False, "No credentials provided"
         missing = [f for f in required_fields if not credentials.get(f)]
@@ -41,20 +41,18 @@ class TwitterPlatform(SocialPlatform):
         """Initialize X.com (Twitter) client."""
         try:
             auth = tweepy.OAuthHandler(
-                self.credentials['api_key'],
-                self.credentials['api_secret']
+                self.credentials["api_key"], self.credentials["api_secret"]
             )
             auth.set_access_token(
-                self.credentials['access_token'],
-                self.credentials['access_secret']
+                self.credentials["access_token"], self.credentials["access_secret"]
             )
             self._api = tweepy.API(auth)
             self._client = tweepy.Client(
-                consumer_key=self.credentials['api_key'],
-                consumer_secret=self.credentials['api_secret'],
-                access_token=self.credentials['access_token'],
-                access_token_secret=self.credentials['access_secret'],
-                wait_on_rate_limit=True
+                consumer_key=self.credentials["api_key"],
+                consumer_secret=self.credentials["api_secret"],
+                access_token=self.credentials["access_token"],
+                access_token_secret=self.credentials["access_secret"],
+                wait_on_rate_limit=True,
             )
             logger.info("Successfully initialized Twitter client")
         except Exception:
@@ -85,10 +83,14 @@ class TwitterPlatform(SocialPlatform):
             tweet_response = await asyncio.to_thread(
                 self._client.create_tweet,
                 text=content.text,
-                media_ids=media_ids if media_ids else None
+                media_ids=media_ids if media_ids else None,
             )
 
-            if tweet_response and hasattr(tweet_response, 'data') and tweet_response.data:
+            if (
+                tweet_response
+                and hasattr(tweet_response, "data")
+                and tweet_response.data
+            ):
                 logger.info("Successfully posted tweet")
                 return True
             else:
