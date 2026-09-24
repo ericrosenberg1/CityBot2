@@ -138,7 +138,15 @@ class NewsMonitor:
 
         for source, feed_info in self.rss_feeds.items():
             try:
-                feed = feedparser.parse(feed_info['url'])
+                # feedparser.parse() does a blocking network fetch with no
+                # built-in timeout, which would otherwise stall the whole
+                # event loop (and every other monitor/post) on a slow or
+                # hanging RSS server. Run it off-thread with a hard timeout,
+                # the same pattern used for the earthquake/weather HTTP calls.
+                feed = await asyncio.wait_for(
+                    asyncio.to_thread(feedparser.parse, feed_info['url']),
+                    timeout=20.0,
+                )
                 entry_count = len(feed.entries)
                 logger.info("Fetched feed from %s, entries: %d",
                             source, entry_count)
