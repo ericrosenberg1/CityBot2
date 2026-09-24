@@ -28,10 +28,18 @@ from database.models import (
 from web.auth import (
     hash_password, verify_password, create_session_token,
     validate_session_token, SESSION_COOKIE, generate_invite_token,
-    has_role,
+    has_role, encrypt_secret,
 )
 
 logger = logging.getLogger("CityBot2.web")
+
+# ─── Login rate limiting ────────────────────────────────────────────────────
+# Simple in-memory sliding-window limiter: this is a single-process admin
+# dashboard with no distributed state, so an in-memory dict is sufficient to
+# stop brute-force password guessing against /login. Keyed by client IP.
+LOGIN_MAX_ATTEMPTS = 8
+LOGIN_WINDOW_SECONDS = 900  # 15 minutes
+_login_attempts: Dict[str, list] = {}
 
 app = FastAPI(title="CityBot2", docs_url=None, redoc_url=None)
 
@@ -142,6 +150,33 @@ def user_count() -> int:
     db = get_db()
     with db.Session() as session:
         return session.query(func.count(User.id)).scalar() or 0
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP, trusting X-Forwarded-For from the Caddy proxy."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _login_rate_limited(ip: str) -> bool:
+    """Return True if this IP has exceeded the login attempt limit."""
+    now = datetime.utcnow().timestamp()
+    attempts = [t for t in _login_attempts.get(ip, []) if now - t < LOGIN_WINDOW_SECONDS]
+    _login_attempts[ip] = attempts
+    return len(attempts) >= LOGIN_MAX_ATTEMPTS
+
+
+def _record_login_attempt(ip: str) -> None:
+    """Record a failed login attempt for this IP."""
+    now = datetime.utcnow().timestamp()
+    _login_attempts.setdefault(ip, []).append(now)
+
+
+def _clear_login_attempts(ip: str) -> None:
+    """Clear attempt history for this IP after a successful login."""
+    _login_attempts.pop(ip, None)
 
 
 def _is_https(request: Request) -> bool:
@@ -291,7 +326,7 @@ async def feed_page(request: Request):
         alerts=alerts,
         recent_earthquakes=recent_earthquakes,
     )
-    resp = templates.TemplateResponse("feed.html", ctx)
+    resp = templates.TemplateResponse(request, "feed.html", ctx)
     return _clear_flash(resp)
 
 
@@ -326,7 +361,7 @@ async def weather_page(request: Request):
         active_alerts=active_alerts,
         all_alerts=all_alerts,
     )
-    resp = templates.TemplateResponse("weather.html", ctx)
+    resp = templates.TemplateResponse(request, "weather.html", ctx)
     return _clear_flash(resp)
 
 
@@ -360,7 +395,7 @@ async def earthquakes_page(request: Request):
         count_24h=count_24h,
         max_mag=max_mag,
     )
-    resp = templates.TemplateResponse("earthquakes.html", ctx)
+    resp = templates.TemplateResponse(request, "earthquakes.html", ctx)
     return _clear_flash(resp)
 
 
@@ -378,7 +413,7 @@ async def news_page(request: Request):
         )
 
     ctx = _base_context(request, articles=articles)
-    resp = templates.TemplateResponse("news.html", ctx)
+    resp = templates.TemplateResponse(request, "news.html", ctx)
     return _clear_flash(resp)
 
 
@@ -401,15 +436,17 @@ async def posts_page(request: Request):
         stats = _get_posting_stats(session)
 
     ctx = _base_context(request, posts=posts, stats=stats)
-    resp = templates.TemplateResponse("posts.html", ctx)
+    resp = templates.TemplateResponse(request, "posts.html", ctx)
     return _clear_flash(resp)
 
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
-    """View current configuration (read-only)."""
+    """View current configuration (read-only). Admin-only: this page shows
+    infra config and partially-redacted credential values, which editor-role
+    accounts shouldn't be able to read."""
     user = require_login(request)
-    if user is None:
+    if not has_role(user, "admin"):
         return RedirectResponse("/login", status_code=303)
 
     city_config = load_city_config_safe()
@@ -429,7 +466,7 @@ async def settings_page(request: Request):
                         env_vars[key] = val
 
     ctx = _base_context(request, env_vars=env_vars)
-    resp = templates.TemplateResponse("settings.html", ctx)
+    resp = templates.TemplateResponse(request, "settings.html", ctx)
     return _clear_flash(resp)
 
 
@@ -438,7 +475,7 @@ async def settings_page(request: Request):
 @app.get("/subscribe", response_class=HTMLResponse)
 async def subscribe_page(request: Request):
     ctx = _base_context(request)
-    resp = templates.TemplateResponse("subscribe.html", ctx)
+    resp = templates.TemplateResponse(request, "subscribe.html", ctx)
     return _clear_flash(resp)
 
 
@@ -520,25 +557,37 @@ async def unsubscribe(request: Request, token: str):
 async def login_page(request: Request):
     show_setup = user_count() == 0
     ctx = _base_context(request, show_setup=show_setup)
-    resp = templates.TemplateResponse("login.html", ctx)
+    resp = templates.TemplateResponse(request, "login.html", ctx)
     return _clear_flash(resp)
 
 
 @app.post("/login")
 async def login_submit(request: Request, email: str = Form(...), password: str = Form(...)):
+    ip = _client_ip(request)
+    if _login_rate_limited(ip):
+        logger.warning("Login rate limit hit for %s", ip)
+        ctx = _base_context(
+            request,
+            error="Too many login attempts. Please wait a few minutes and try again.",
+            show_setup=user_count() == 0,
+        )
+        return templates.TemplateResponse(request, "login.html", ctx, status_code=429)
+
     db = get_db()
     with db.Session() as session:
         u = session.query(User).filter_by(email=email).first()
         if u and u.is_active and u.password_hash and verify_password(password, u.password_hash):
             u.last_login = datetime.utcnow()
             session.commit()
+            _clear_login_attempts(ip)
             token = create_session_token(u.id)
             resp = RedirectResponse("/admin/dashboard", status_code=303)
             _set_session_cookie(resp, token, request)
             return resp
     # Failed
+    _record_login_attempt(ip)
     ctx = _base_context(request, error="Invalid email or password", show_setup=user_count() == 0)
-    return templates.TemplateResponse("login.html", ctx)
+    return templates.TemplateResponse(request, "login.html", ctx)
 
 
 @app.get("/logout")
@@ -553,7 +602,7 @@ async def setup_page(request: Request):
     if user_count() > 0:
         return RedirectResponse("/login", status_code=303)
     ctx = _base_context(request)
-    return templates.TemplateResponse("setup.html", ctx)
+    return templates.TemplateResponse(request, "setup.html", ctx)
 
 
 @app.post("/setup")
@@ -568,10 +617,13 @@ async def setup_submit(
         return RedirectResponse("/login", status_code=303)
     if password != confirm_password:
         ctx = _base_context(request, error="Passwords do not match")
-        return templates.TemplateResponse("setup.html", ctx)
+        return templates.TemplateResponse(request, "setup.html", ctx)
     if len(password) < 8:
         ctx = _base_context(request, error="Password must be at least 8 characters")
-        return templates.TemplateResponse("setup.html", ctx)
+        return templates.TemplateResponse(request, "setup.html", ctx)
+    if len(password.encode("utf-8")) > 72:
+        ctx = _base_context(request, error="Password must be 72 characters or fewer")
+        return templates.TemplateResponse(request, "setup.html", ctx)
 
     db = get_db()
     with db.Session() as session:
@@ -599,9 +651,9 @@ async def invite_page(request: Request, token: str):
         u = session.query(User).filter_by(invite_token=token).first()
         if not u or (u.invite_expires and u.invite_expires < datetime.utcnow()):
             ctx = _base_context(request, error="Invalid or expired invite link")
-            return templates.TemplateResponse("login.html", ctx)
+            return templates.TemplateResponse(request, "login.html", ctx)
     ctx = _base_context(request, invite_token=token, invite_email=u.email)
-    return templates.TemplateResponse("invite.html", ctx)
+    return templates.TemplateResponse(request, "invite.html", ctx)
 
 
 @app.post("/invite/{token}")
@@ -614,17 +666,20 @@ async def invite_submit(
 ):
     if password != confirm_password:
         ctx = _base_context(request, invite_token=token, error="Passwords do not match")
-        return templates.TemplateResponse("invite.html", ctx)
+        return templates.TemplateResponse(request, "invite.html", ctx)
     if len(password) < 8:
         ctx = _base_context(request, invite_token=token, error="Password must be at least 8 characters")
-        return templates.TemplateResponse("invite.html", ctx)
+        return templates.TemplateResponse(request, "invite.html", ctx)
+    if len(password.encode("utf-8")) > 72:
+        ctx = _base_context(request, invite_token=token, error="Password must be 72 characters or fewer")
+        return templates.TemplateResponse(request, "invite.html", ctx)
 
     db = get_db()
     with db.Session() as session:
         u = session.query(User).filter_by(invite_token=token).first()
         if not u or (u.invite_expires and u.invite_expires < datetime.utcnow()):
             ctx = _base_context(request, error="Invalid or expired invite link")
-            return templates.TemplateResponse("login.html", ctx)
+            return templates.TemplateResponse(request, "login.html", ctx)
         u.password_hash = hash_password(password)
         u.display_name = display_name or u.email.split("@")[0]
         u.invite_token = None
@@ -705,7 +760,7 @@ async def admin_dashboard(request: Request):
         stats=stats,
         bot_running=bot_running,
     )
-    resp = templates.TemplateResponse("dashboard.html", ctx)
+    resp = templates.TemplateResponse(request, "dashboard.html", ctx)
     return _clear_flash(resp)
 
 
@@ -718,7 +773,7 @@ async def admin_city_page(request: Request):
         return RedirectResponse("/login", status_code=303)
     city_config = load_city_config_safe()
     ctx = _base_context(request, city_config=city_config)
-    resp = templates.TemplateResponse("admin/city.html", ctx)
+    resp = templates.TemplateResponse(request, "admin/city.html", ctx)
     return _clear_flash(resp)
 
 
@@ -792,7 +847,7 @@ async def admin_users_page(request: Request):
             session.expunge(u)
 
     ctx = _base_context(request, users=users)
-    resp = templates.TemplateResponse("admin/users.html", ctx)
+    resp = templates.TemplateResponse(request, "admin/users.html", ctx)
     return _clear_flash(resp)
 
 
@@ -882,7 +937,7 @@ async def admin_social_page(request: Request):
         connected=connected,
         accounts=accounts,
     )
-    resp = templates.TemplateResponse("admin/social.html", ctx)
+    resp = templates.TemplateResponse(request, "admin/social.html", ctx)
     return _clear_flash(resp)
 
 
@@ -904,12 +959,16 @@ async def admin_social_connect(request: Request):
         creds[field] = form.get(field, "")
 
     account_name = creds.get("handle") or creds.get("username") or creds.get("page_id") or platform
+    # Credentials are encrypted at rest (Fernet, keyed off data/secret.key) -
+    # these are real social-platform passwords/API secrets/tokens, not
+    # something that should ever sit in the sqlite file as plain JSON.
+    encrypted_creds = encrypt_secret(json.dumps(creds))
 
     db = get_db()
     with db.Session() as session:
         existing = session.query(SocialAccount).filter_by(platform=platform).first()
         if existing:
-            existing.credentials_json = json.dumps(creds)
+            existing.credentials_json = encrypted_creds
             existing.account_name = account_name
             existing.is_active = True
             existing.connected_by_id = user.id
@@ -918,7 +977,7 @@ async def admin_social_connect(request: Request):
             sa = SocialAccount(
                 platform=platform,
                 account_name=account_name,
-                credentials_json=json.dumps(creds),
+                credentials_json=encrypted_creds,
                 connected_by_id=user.id,
             )
             session.add(sa)
@@ -975,7 +1034,7 @@ async def admin_announcements_page(request: Request):
             })
 
     ctx = _base_context(request, announcements=ann_list)
-    resp = templates.TemplateResponse("admin/announcements.html", ctx)
+    resp = templates.TemplateResponse(request, "admin/announcements.html", ctx)
     return _clear_flash(resp)
 
 
@@ -1031,7 +1090,7 @@ async def admin_sources_page(request: Request):
             session.expunge(src)
 
     ctx = _base_context(request, sources=sources)
-    resp = templates.TemplateResponse("admin/sources.html", ctx)
+    resp = templates.TemplateResponse(request, "admin/sources.html", ctx)
     return _clear_flash(resp)
 
 
@@ -1214,7 +1273,7 @@ async def admin_queue_page(request: Request):
         failed_items=failed_items,
         queue_stats=queue_stats,
     )
-    resp = templates.TemplateResponse("admin/queue.html", ctx)
+    resp = templates.TemplateResponse(request, "admin/queue.html", ctx)
     return _clear_flash(resp)
 
 

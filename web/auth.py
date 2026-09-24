@@ -1,8 +1,11 @@
+import base64
+import hashlib
 import secrets
 from datetime import datetime
 from pathlib import Path
-from passlib.hash import bcrypt
+import bcrypt
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Request
 
 SECRET_KEY_PATH = Path("data/secret.key")
@@ -17,6 +20,34 @@ def get_secret_key():
     return key
 
 
+_fernet = None
+
+
+def get_fernet() -> Fernet:
+    """Symmetric cipher for encrypting secrets at rest (e.g. social platform
+    credentials), derived from the same app secret key used for sessions."""
+    global _fernet
+    if _fernet is None:
+        digest = hashlib.sha256(get_secret_key().encode("utf-8")).digest()
+        _fernet = Fernet(base64.urlsafe_b64encode(digest))
+    return _fernet
+
+
+def encrypt_secret(plaintext: str) -> str:
+    """Encrypt a string for storage at rest."""
+    return get_fernet().encrypt(plaintext.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_secret(token: str) -> str:
+    """Decrypt a value previously encrypted with encrypt_secret.
+    Returns "" if the token is invalid or was stored before encryption
+    was added (legacy plaintext), rather than raising."""
+    try:
+        return get_fernet().decrypt(token.encode("utf-8")).decode("utf-8")
+    except (InvalidToken, ValueError):
+        return ""
+
+
 _serializer = None
 
 
@@ -27,12 +58,23 @@ def get_serializer():
     return _serializer
 
 
-def hash_password(password):
-    return bcrypt.hash(password)
+MAX_PASSWORD_BYTES = 72  # bcrypt's own hard limit
 
 
-def verify_password(password, hashed):
-    return bcrypt.verify(password, hashed)
+def hash_password(password: str) -> str:
+    # Use the bcrypt package directly rather than passlib.hash.bcrypt: passlib
+    # 1.7.4 (unmaintained since 2020) misdetects modern bcrypt (>=4.1, which
+    # dropped the __about__.__version__ attribute passlib's backend probe
+    # relies on) and raises "password cannot be longer than 72 bytes" even for
+    # short passwords, during its own internal self-test.
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
 
 
 def create_session_token(user_id):
