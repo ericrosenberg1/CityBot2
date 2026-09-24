@@ -74,7 +74,11 @@ pip install --upgrade pip
 2. **Install dependencies:**
    ```sh
    pip install -r requirements.txt
+   pip install --no-deps blueskysocial==2.1.0
    ```
+   (`blueskysocial` pins an old Pillow/opencv-python version that conflicts with the
+   security-patched Pillow pin above, so it's installed separately without its
+   declared sub-dependencies.)
 
 3. **Configure city and credentials:**
    ```sh
