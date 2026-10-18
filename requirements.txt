@@ -4,10 +4,20 @@ aiohttp==3.14.5
 # pillow security pin below. opencv-python-headless here satisfies its runtime import
 # of cv2 (used only for its video-post path, which CityBot2 never calls).
 opencv-python-headless==5.0.0.93
-# tweepy caps oauthlib<4, which holds the transitive oauthlib at 3.3.1. That version
-# carries PYSEC-2026-4114 (PKCE timing side-channel in the authorization-server grant
-# path, which this OAuth client never runs). oauthlib 4.0.0 fixes it but conflicts with
-# tweepy's own constraint, and 4.17.0 is tweepy's latest. Revisit when tweepy allows it.
+# tweepy 4.17.0 is its latest release, and tweepy master still carries the same
+# `oauthlib>=3.2.0,<4` pin. That cap holds the transitive oauthlib at 3.3.1, which has
+# two open advisories, both in the OAuth2 *authorization-server* code that this OAuth1
+# client never imports:
+#   CVE-2026-49265 / GHSA-xpv3-w29h-x7cv  PKCE code_verifier timing comparison (CWE-208)
+#   CVE-2026-49264 / GHSA-hj66-6f7g-4r5v  JSONP injection in RevocationEndpoint (CWE-79)
+# Both are fixed only in oauthlib 4.0.0, whose entire changelog is provider-side.
+# GHSA-xpv3-w29h-x7cv names "3.3.2" as its patched version, but 3.3.2 was never published
+# to PyPI, so there is no fix inside tweepy's cap. Forcing 4.0.0 with
+# `pip install --no-deps` was tested on 2026-10-18: the OAuth1 Authorization header, the
+# OAuth2 authorize URI and the token request body all came out byte-identical to 3.3.1.
+# We still keep 3.3.1, because the override hard-pins oauthlib (so later oauthlib fixes
+# stop arriving) and breaks `pip check` for zero reachable-code gain. Revisit when tweepy
+# relaxes the cap.
 tweepy==4.17.0
 facebook-sdk==3.1.0
 pillow==12.3.0
@@ -30,6 +40,9 @@ aiosqlite==0.22.1
 anyio>=4.4.0
 idna>=3.15
 setuptools>=78.1.1
+# 2.8.0 is urllib3's latest and clears CVE-2026-97687 (HTTPS proxy TLS configuration
+# ignored, CWE-295) and CVE-2026-97689 (unbounded chunk-size line buffered by
+# HTTPResponse.stream(), CWE-770). Both are fixed in exactly 2.8.0, nothing earlier.
 urllib3>=2.8.0
 zipp>=3.19.1
 
