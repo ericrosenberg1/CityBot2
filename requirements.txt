@@ -33,7 +33,7 @@ requests==2.34.2
 beautifulsoup4==4.15.0
 python-dotenv==1.2.4
 feedparser==6.0.14
-sqlalchemy==2.1.4
+sqlalchemy==2.1.5
 colorama==0.4.6
 tqdm==4.70.1
 aiosqlite==0.22.1
