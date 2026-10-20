@@ -2,3 +2,7 @@
 -r requirements.txt
 pytest>=8.4
 httpx2>=2.15.1
+# Pinned so the gate's formatter does not move under the repo. ruff 0.16.0 also
+# widened the default rule set, which scripts/ci-gates.sh now pins by naming its
+# rules explicitly.
+ruff==0.15.14
