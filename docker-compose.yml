@@ -16,6 +16,10 @@ services:
       CITYBOT_MODE: ${CITYBOT_MODE:-all}
       CITYBOT_PORT: "8080"
       TZ: ${TZ:-America/Los_Angeles}
+      # Only Caddy (fixed address below) may set X-Forwarded-For.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.30.57.10}
+    networks:
+      - citybot
     # When using Caddy (CITYBOT_DOMAIN is set), don't expose ports directly.
     # When no domain, expose the port for direct access.
     ports:
@@ -39,6 +43,9 @@ services:
       - caddy-config:/config
     environment:
       CITYBOT_DOMAIN: ${CITYBOT_DOMAIN:-localhost}
+    networks:
+      citybot:
+        ipv4_address: 172.30.57.10
     depends_on:
       - citybot
 
@@ -49,3 +56,9 @@ volumes:
   citybot-cache:
   caddy-data:
   caddy-config:
+
+networks:
+  citybot:
+    ipam:
+      config:
+        - subnet: 172.30.57.0/24

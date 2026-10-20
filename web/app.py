@@ -6,7 +6,7 @@ import logging
 import os
 import secrets
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -55,7 +55,7 @@ def _utcnow() -> datetime:
     DateTime columns store here, and what every existing comparison in this
     file assumes). datetime.utcnow() is deprecated; this is the same value
     via the non-deprecated call."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 # ─── Login rate limiting ────────────────────────────────────────────────────
@@ -63,13 +63,26 @@ def _utcnow() -> datetime:
 # dashboard with no distributed state, so an in-memory dict is sufficient to
 # stop brute-force password guessing against /login. Keyed by client IP.
 LOGIN_MAX_ATTEMPTS = 8
+# Compared against when a login names no account, to keep timing even.
+_DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
 LOGIN_WINDOW_SECONDS = 900  # 15 minutes
 _login_attempts: dict[str, list] = {}
 
 app = FastAPI(title="CityBot2", docs_url=None, redoc_url=None)
 
-# Trust proxy headers (X-Forwarded-For, X-Forwarded-Proto) when behind Caddy/nginx
-# FastAPI/Starlette handle this via --proxy-headers in uvicorn (set below)
+# Uvicorn applies X-Forwarded-For/Proto only from proxies listed in
+# FORWARDED_ALLOW_IPS (see citybot/__main__.py).
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Baseline headers for installs without Caddy in front (Caddy sets the same)."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
+
 
 # Mount static files and templates
 WEB_DIR = Path(__file__).resolve().parent
@@ -183,10 +196,13 @@ def user_count() -> int:
 
 
 def _client_ip(request: Request) -> str:
-    """Best-effort client IP, trusting X-Forwarded-For from the Caddy proxy."""
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """Client IP for login rate limiting.
+
+    Uvicorn has already swapped in the X-Forwarded-For address when the
+    request came through a trusted proxy (FORWARDED_ALLOW_IPS). Reading the
+    header here directly let anyone dodge the limit by sending a new fake
+    address with each guess.
+    """
     return request.client.host if request.client else "unknown"
 
 
@@ -244,6 +260,7 @@ def get_base_url(request: Request) -> str:
 def _flash(response, message, category="success"):
     """Set a flash cookie."""
     response.set_cookie("flash_msg", message, max_age=10, httponly=True)
+    response.set_cookie("flash_cat", category, max_age=10, httponly=True)
 
 
 def _get_flash(request):
@@ -292,6 +309,14 @@ def _save_json_file(path: Path, data: dict) -> None:
         json.dump(data, f, indent=2)
 
 
+def _page_number(request: Request) -> int:
+    """?page= as a positive int. A bad value used to raise a 500."""
+    try:
+        return max(int(request.query_params.get("page", 1)), 1)
+    except ValueError:
+        return 1
+
+
 def _table_exists(session, table_name: str) -> bool:
     """Check if a table exists in the database."""
     try:
@@ -309,7 +334,7 @@ async def feed_page(request: Request):
     """Public community news feed homepage."""
     db = get_db()
     current_type = request.query_params.get("type")
-    page = int(request.query_params.get("page", 1))
+    page = _page_number(request)
     per_page = 20
 
     feed_items = []
@@ -640,12 +665,12 @@ async def login_submit(
     db = get_db()
     with db.Session() as session:
         u = session.query(User).filter_by(email=email).first()
-        if (
-            u
-            and u.is_active
-            and u.password_hash
-            and verify_password(password, u.password_hash)
-        ):
+        # Always run one bcrypt check, so response time doesn't reveal
+        # whether the email has an account.
+        password_ok = verify_password(
+            password, (u.password_hash if u else None) or _DUMMY_HASH
+        )
+        if u and u.is_active and u.password_hash and password_ok:
             u.last_login = _utcnow()
             session.commit()
             _clear_login_attempts(ip)
@@ -879,6 +904,11 @@ async def admin_city_save(
             if configs:
                 slug = configs[0].stem
 
+    if not slug:
+        resp = RedirectResponse("/admin/city", status_code=303)
+        _flash(resp, "Set CITY_NAME before saving city settings.", "error")
+        return resp
+
     config_path = PROJECT_ROOT / "config" / "cities" / f"{slug}.json"
     existing = await asyncio.to_thread(_load_json_file, config_path)
 
@@ -895,7 +925,8 @@ async def admin_city_save(
         pass
     if "weather" not in existing:
         existing["weather"] = {}
-    existing["weather"]["zone"] = weather_zone
+    # The bot reads zone_code. This form used to write "zone", which nothing read.
+    existing["weather"]["zone_code"] = weather_zone
     existing["weather"]["radar_station"] = radar_station
 
     await asyncio.to_thread(_save_json_file, config_path, existing)
@@ -969,7 +1000,8 @@ async def admin_users_toggle(request: Request, user_id: int):
     db = get_db()
     with db.Session() as session:
         target = session.query(User).filter_by(id=user_id).first()
-        if target and target.id != user.id:
+        # Admins can't switch off accounts that outrank them (the superadmin).
+        if target and target.id != user.id and has_role(user, target.role):
             target.is_active = not target.is_active
             session.commit()
 
@@ -1096,11 +1128,16 @@ async def admin_announcements_page(request: Request):
         announcements = (
             session.query(Announcement).order_by(Announcement.created_at.desc()).all()
         )
+        # One query for every creator, instead of one per announcement.
+        creator_ids = {a.created_by_id for a in announcements if a.created_by_id}
+        creators = (
+            {u.id: u for u in session.query(User).filter(User.id.in_(creator_ids))}
+            if creator_ids
+            else {}
+        )
         ann_list = []
         for a in announcements:
-            creator = None
-            if a.created_by_id:
-                creator = session.query(User).filter_by(id=a.created_by_id).first()
+            creator = creators.get(a.created_by_id)
             ann_list.append(
                 {
                     "id": a.id,
@@ -1378,13 +1415,17 @@ async def admin_queue_post_now(request: Request, item_id: int):
     with db.Session() as session:
         item = session.query(PostQueue).filter_by(id=item_id).first()
         if item and item.status in ("pending", "failed"):
-            item.status = "posted"
-            item.posted_at = _utcnow()
+            # Hand it to the bot as an immediate post. This used to mark the
+            # item "posted" without posting it anywhere.
+            item.status = "pending"
+            item.priority = "immediate"
+            item.retry_count = 0
             item.error_message = None
+            item.expires_at = _utcnow() + timedelta(hours=6)
             session.commit()
 
     resp = RedirectResponse("/admin/queue", status_code=303)
-    _flash(resp, "Item marked as posted")
+    _flash(resp, "Item queued to post now")
     return resp
 
 
