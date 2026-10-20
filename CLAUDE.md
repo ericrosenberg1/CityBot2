@@ -15,7 +15,7 @@
 
 ## File map
 - `main.py`: bot loop (`python -m citybot` is the entry point)
-- `config/__init__.py`: `ConfigurationManager` (a `config.py` beside the `config/` package is never imported, which broke startup until 2026-10-20)
+- `config.py`: `ConfigurationManager`. Never add `config/__init__.py`: it shadows `config.py` and breaks startup (`tests/test_config_import.py` guards this)
 - `monitors/` — earthquake, weather, news polling
 - `social_media/platforms/`: Bluesky, Twitter, Reddit, etc. Meta Graph helpers live in `base.py`
 - `posting/queue_manager.py`: post queue: dedupe, schedule, quiet hours (city time), PostHistory
