@@ -64,7 +64,9 @@ def run_web():
     port = int(os.getenv("CITYBOT_PORT", "8080"))
     uvicorn.run(
         "web.app:app",
-        host="0.0.0.0",
+        # Loopback unless CITYBOT_HOST says otherwise. The Docker image and
+        # the systemd unit set 0.0.0.0 so the port is reachable from outside.
+        host=os.getenv("CITYBOT_HOST", "127.0.0.1"),
         port=port,
         log_level="warning",
         access_log=False,

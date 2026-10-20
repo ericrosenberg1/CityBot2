@@ -65,7 +65,7 @@ class SocialMediaManager:
         """Initialize configured social media platforms.
 
         Each platform's base class validates its own credentials via
-        CREDENTIAL_MAP — no separate validation dict needed here.
+        CREDENTIAL_FIELDS, so no separate validation dict is needed here.
         """
         for name, cls in PLATFORM_CLASSES.items():
             platform_config = self.config["platforms"].get(name, {})

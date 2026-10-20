@@ -24,7 +24,10 @@ async def graph_error(response: aiohttp.ClientResponse) -> str:
 class SocialPlatform(ABC):
     """Base class for all social media platforms."""
 
-    CREDENTIAL_MAP: ClassVar[dict[str, str]] = {}
+    NAME: ClassVar[str] = ""
+    # Credential field names. Each can come from the admin UI or from the
+    # env var {NAME}_{FIELD}, e.g. ("access_token",) reads THREADS_ACCESS_TOKEN.
+    CREDENTIAL_FIELDS: ClassVar[tuple[str, ...]] = ()
     CHAR_LIMIT: int = 5000
 
     def __init__(self, platform_config: dict[str, Any], city_config: dict[str, Any]):
@@ -34,13 +37,21 @@ class SocialPlatform(ABC):
         self._session: aiohttp.ClientSession | None = None
         self.credentials = self._load_credentials(platform_config)
 
+    @classmethod
+    def credential_env_vars(cls) -> dict[str, str]:
+        """Credential field -> the env var it falls back to."""
+        return {
+            field: f"{cls.NAME.upper()}_{field.upper()}"
+            for field in cls.CREDENTIAL_FIELDS
+        }
+
     def _load_credentials(self, config: dict[str, Any]) -> dict[str, str]:
-        """Load credentials from config dict or env vars using CREDENTIAL_MAP."""
+        """Load credentials from the config dict, falling back to env vars."""
         creds = config.get("credentials", {})
         credentials = {}
         missing = []
 
-        for key, env_var in self.CREDENTIAL_MAP.items():
+        for key, env_var in self.credential_env_vars().items():
             value = creds.get(key) or os.getenv(env_var)
             if value:
                 credentials[key] = value

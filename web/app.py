@@ -36,6 +36,7 @@ from database.models import (
     WeatherReport,
 )
 from database.operations import DatabaseManager
+from social_media.social_media_manager import PLATFORM_CLASSES
 from web.auth import (
     SESSION_COOKIE,
     create_session_token,
@@ -1012,15 +1013,9 @@ async def admin_users_toggle(request: Request, user_id: int):
 
 # ─── Admin: Social Accounts ───────────────────────────────────────────────────
 
+# The connect form's fields come from each platform's own credential list.
 PLATFORM_FIELDS = {
-    "twitter": ["api_key", "api_secret", "access_token", "access_secret"],
-    "bluesky": ["handle", "password"],
-    "facebook": ["page_id", "access_token"],
-    "linkedin": ["client_id", "client_secret", "access_token"],
-    "reddit": ["client_id", "client_secret", "username", "password"],
-    "threads": ["access_token", "user_id"],
-    "instagram": ["access_token", "business_account_id"],
-    "nextdoor": ["access_token", "agency_id"],
+    name: list(cls.CREDENTIAL_FIELDS) for name, cls in PLATFORM_CLASSES.items()
 }
 
 
@@ -1605,7 +1600,7 @@ def main():
 
     uvicorn.run(
         "web.app:app",
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=8080,
         reload=True,
         log_level="info",

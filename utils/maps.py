@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 - runs cutycapt only, with fixed arguments
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -196,7 +196,7 @@ class LocationMapGenerator:
         try:
             m.save(html_path)
             if shutil.which("cutycapt"):
-                subprocess.run(
+                subprocess.run(  # nosec B603 B607 - fixed argv, no shell, cutycapt found on PATH by shutil.which
                     ["cutycapt", f"--url=file://{html_path}", f"--out={image_path}"],
                     timeout=30,
                     check=False,

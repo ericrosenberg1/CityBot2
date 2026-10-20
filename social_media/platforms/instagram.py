@@ -10,10 +10,12 @@ logger = logging.getLogger(__name__)
 class InstagramPlatform(SocialPlatform):
     """Instagram platform implementation using the Instagram Graph API."""
 
-    CREDENTIAL_MAP: ClassVar[dict[str, str]] = {
-        "access_token": "INSTAGRAM_ACCESS_TOKEN",
-        "business_account_id": "INSTAGRAM_BUSINESS_ACCOUNT_ID",
-    }
+    NAME = "instagram"
+    # Each field reads from INSTAGRAM_<FIELD> when the admin UI has no value.
+    CREDENTIAL_FIELDS: ClassVar[tuple[str, ...]] = (
+        "access_token",
+        "business_account_id",
+    )
     CHAR_LIMIT = 2200
 
     async def initialize_client(self) -> None:

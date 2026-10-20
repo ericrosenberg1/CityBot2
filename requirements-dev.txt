@@ -1,4 +1,4 @@
 # Test dependencies, on top of requirements.txt.
 -r requirements.txt
 pytest>=8.4
-httpx>=0.28
+httpx2>=2.15.1

@@ -36,24 +36,24 @@ sqlalchemy==2.1.5
 colorama==0.4.6
 tqdm==4.70.1
 aiosqlite==0.22.1
-anyio>=4.4.0
-idna>=3.15
-setuptools>=78.1.1
+anyio>=4.15.1
+idna>=3.20
+setuptools>=84.2.0
 # 2.8.0 is urllib3's latest and clears CVE-2026-97687 (HTTPS proxy TLS configuration
 # ignored, CWE-295) and CVE-2026-97689 (unbounded chunk-size line buffered by
 # HTTPResponse.stream(), CWE-770). Both are fixed in exactly 2.8.0, nothing earlier.
 urllib3>=2.8.0
-zipp>=3.19.1
+zipp>=4.1.1
 
 # Error + performance monitoring
-sentry-sdk>=2.18
+sentry-sdk>=2.72.0
 
 # Web dashboard
-fastapi>=0.136.1
-uvicorn[standard]>=0.24.0
-jinja2>=3.1.2
+fastapi>=0.153.0
+uvicorn[standard]>=0.54.0
+jinja2>=3.1.6
 bcrypt==5.0.0
 itsdangerous==2.2.0
 feedgen==1.0.0
 python-multipart==0.0.32
-cryptography>=43.0.0
+cryptography>=50.0.2

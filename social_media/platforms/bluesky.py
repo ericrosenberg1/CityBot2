@@ -1,22 +1,24 @@
-import logging
 import asyncio
-from typing import Dict, Any
+import logging
+from typing import ClassVar
 
-from blueskysocial import Client, Post, Image
+from blueskysocial import Client, Image, Post
 
-from .base import SocialPlatform
 from ..utils import PostContent
+from .base import SocialPlatform
 
-logger = logging.getLogger('CityBot2.social.bluesky')
+logger = logging.getLogger("CityBot2.social.bluesky")
 
 
 class BlueSkyPlatform(SocialPlatform):
     """Bluesky platform implementation."""
 
-    CREDENTIAL_MAP = {
-        'handle': 'BLUESKY_HANDLE',
-        'password': 'BLUESKY_PASSWORD',
-    }
+    NAME = "bluesky"
+    # Each field reads from BLUESKY_<FIELD> when the admin UI has no value.
+    CREDENTIAL_FIELDS: ClassVar[tuple[str, ...]] = (
+        "handle",
+        "password",
+    )
     CHAR_LIMIT = 300
 
     async def initialize_client(self) -> None:
@@ -25,10 +27,13 @@ class BlueSkyPlatform(SocialPlatform):
             self._client = Client()
             await asyncio.to_thread(
                 self._client.authenticate,
-                self.credentials['handle'],
-                self.credentials['password']
+                self.credentials["handle"],
+                self.credentials["password"],
             )
-            logger.info("Successfully authenticated Bluesky client for %s", self.credentials['handle'])
+            logger.info(
+                "Successfully authenticated Bluesky client for %s",
+                self.credentials["handle"],
+            )
         except Exception as e:
             logger.error("Failed to initialize Bluesky client: %s", str(e))
             self._client = None
@@ -48,10 +53,10 @@ class BlueSkyPlatform(SocialPlatform):
                 try:
                     image = Image(
                         formatted_content.media.image_path,
-                        alt_text=formatted_content.text[:100]
+                        alt_text=formatted_content.text[:100],
                     )
                     post = Post(formatted_content.text, with_attachments=[image])
-                except Exception as img_err:
+                except Exception as img_err:  # noqa: BLE001 - post without the image rather than not at all
                     logger.warning("Could not attach image: %s", img_err)
                     post = Post(formatted_content.text)
             else:
@@ -66,6 +71,6 @@ class BlueSkyPlatform(SocialPlatform):
                 logger.warning("Post to Bluesky returned no result")
                 return False
 
-        except Exception as e:
-            logger.error("Error posting to Bluesky: %s", str(e))
+        except Exception:
+            logger.exception("Error posting to Bluesky")
             return False

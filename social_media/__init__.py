@@ -1,4 +1,4 @@
 from .platforms.base import SocialPlatform
 from .social_media_manager import SocialMediaManager
 
-__all__ = ['SocialPlatform', 'SocialMediaManager']
+__all__ = ["SocialMediaManager", "SocialPlatform"]

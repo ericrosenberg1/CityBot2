@@ -1,21 +1,21 @@
 from .base import SocialPlatform
-from .twitter import TwitterPlatform
 from .bluesky import BlueSkyPlatform
 from .facebook import FacebookPlatform
+from .instagram import InstagramPlatform
 from .linkedin import LinkedInPlatform
+from .nextdoor import NextdoorPlatform
 from .reddit import RedditPlatform
 from .threads import ThreadsPlatform
-from .instagram import InstagramPlatform
-from .nextdoor import NextdoorPlatform
+from .twitter import TwitterPlatform
 
 __all__ = [
-    'SocialPlatform',
-    'TwitterPlatform',
-    'BlueSkyPlatform',
-    'FacebookPlatform',
-    'LinkedInPlatform',
-    'RedditPlatform',
-    'ThreadsPlatform',
-    'InstagramPlatform',
-    'NextdoorPlatform',
+    "BlueSkyPlatform",
+    "FacebookPlatform",
+    "InstagramPlatform",
+    "LinkedInPlatform",
+    "NextdoorPlatform",
+    "RedditPlatform",
+    "SocialPlatform",
+    "ThreadsPlatform",
+    "TwitterPlatform",
 ]

@@ -9,6 +9,8 @@ from typing import Any, ClassVar
 
 from dotenv import load_dotenv
 
+from social_media.social_media_manager import PLATFORM_CLASSES
+
 logger = logging.getLogger("CityBot2.config")
 
 
@@ -150,107 +152,21 @@ class ConfigurationManager:
         """Initialize configuration for each social network."""
         networks = {}
 
-        network_configs = {
-            "twitter": {
-                "required_vars": [
-                    "TWITTER_API_KEY",
-                    "TWITTER_API_SECRET",
-                    "TWITTER_ACCESS_TOKEN",
-                    "TWITTER_ACCESS_SECRET",
-                ],
-                "credentials_map": {
-                    "TWITTER_API_KEY": "api_key",
-                    "TWITTER_API_SECRET": "api_secret",
-                    "TWITTER_ACCESS_TOKEN": "access_token",
-                    "TWITTER_ACCESS_SECRET": "access_secret",
-                },
-            },
-            "bluesky": {
-                "required_vars": ["BLUESKY_HANDLE", "BLUESKY_PASSWORD"],
-                "credentials_map": {
-                    "BLUESKY_HANDLE": "handle",
-                    "BLUESKY_PASSWORD": "password",
-                },
-            },
-            "facebook": {
-                "required_vars": ["FACEBOOK_PAGE_ID", "FACEBOOK_ACCESS_TOKEN"],
-                "credentials_map": {
-                    "FACEBOOK_PAGE_ID": "page_id",
-                    "FACEBOOK_ACCESS_TOKEN": "access_token",
-                },
-            },
-            "linkedin": {
-                "required_vars": [
-                    "LINKEDIN_CLIENT_ID",
-                    "LINKEDIN_CLIENT_SECRET",
-                    "LINKEDIN_ACCESS_TOKEN",
-                ],
-                "credentials_map": {
-                    "LINKEDIN_CLIENT_ID": "client_id",
-                    "LINKEDIN_CLIENT_SECRET": "client_secret",
-                    "LINKEDIN_ACCESS_TOKEN": "access_token",
-                },
-            },
-            "reddit": {
-                "required_vars": [
-                    "REDDIT_CLIENT_ID",
-                    "REDDIT_CLIENT_SECRET",
-                    "REDDIT_USERNAME",
-                    "REDDIT_PASSWORD",
-                ],
-                "credentials_map": {
-                    "REDDIT_CLIENT_ID": "client_id",
-                    "REDDIT_CLIENT_SECRET": "client_secret",
-                    "REDDIT_USERNAME": "username",
-                    "REDDIT_PASSWORD": "password",
-                },
-            },
-            "threads": {
-                "required_vars": ["THREADS_ACCESS_TOKEN", "THREADS_USER_ID"],
-                "credentials_map": {
-                    "THREADS_ACCESS_TOKEN": "access_token",
-                    "THREADS_USER_ID": "user_id",
-                },
-            },
-            "instagram": {
-                "required_vars": [
-                    "INSTAGRAM_ACCESS_TOKEN",
-                    "INSTAGRAM_BUSINESS_ACCOUNT_ID",
-                ],
-                "credentials_map": {
-                    "INSTAGRAM_ACCESS_TOKEN": "access_token",
-                    "INSTAGRAM_BUSINESS_ACCOUNT_ID": "business_account_id",
-                },
-            },
-            "nextdoor": {
-                "required_vars": ["NEXTDOOR_ACCESS_TOKEN", "NEXTDOOR_AGENCY_ID"],
-                "credentials_map": {
-                    "NEXTDOOR_ACCESS_TOKEN": "access_token",
-                    "NEXTDOOR_AGENCY_ID": "agency_id",
-                },
-            },
-        }
-
-        for network, cfg in network_configs.items():
+        for network, platform_cls in PLATFORM_CLASSES.items():
             # Check if this platform is enabled
             enabled = os.getenv(f"{network.upper()}_ENABLED", "false").lower() == "true"
             if not enabled:
                 continue
 
-            # Check if all required vars are present
-            missing_vars = [var for var in cfg["required_vars"] if not os.getenv(var)]
+            env_vars = platform_cls.credential_env_vars()
+            missing_vars = [var for var in env_vars.values() if not os.getenv(var)]
             if missing_vars:
                 logger.warning(
                     f"{network.capitalize()} is enabled but missing required environment variables: {missing_vars}"
                 )
                 continue
 
-            # Build credentials dictionary with mapped keys
-            credentials = {}
-            for env_var, cred_key in cfg["credentials_map"].items():
-                env_value = os.getenv(env_var)
-                if env_value:
-                    credentials[cred_key] = env_value
+            credentials = {field: os.getenv(var) for field, var in env_vars.items()}
 
             networks[network] = SocialNetworkConfig(
                 enabled=True,

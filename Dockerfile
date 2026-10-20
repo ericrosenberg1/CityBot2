@@ -1,6 +1,9 @@
 FROM python:3.12-slim AS builder
 
 # System deps needed to compile cartopy, matplotlib, bcrypt
+# Debian rotates exact package versions out of its archive, so pinning them
+# breaks rebuilds. The python:3.12-slim base pins the release instead.
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc g++ libgeos-dev libproj-dev proj-data proj-bin libffi-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -13,6 +16,9 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt \
 # --- Production image ---
 FROM python:3.12-slim
 
+# Debian rotates exact package versions out of its archive, so pinning them
+# breaks rebuilds. The python:3.12-slim base pins the release instead.
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgeos-c1v5 libproj25 proj-data proj-bin curl \
     && rm -rf /var/lib/apt/lists/* \
@@ -30,6 +36,7 @@ USER citybot
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    CITYBOT_HOST=0.0.0.0 \
     CITYBOT_PORT=8080 \
     CITYBOT_MODE=all
 

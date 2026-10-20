@@ -12,10 +12,12 @@ THREADS_API_BASE = "https://graph.threads.net/v1.0"
 class ThreadsPlatform(SocialPlatform):
     """Threads (by Meta) platform implementation."""
 
-    CREDENTIAL_MAP: ClassVar[dict[str, str]] = {
-        "access_token": "THREADS_ACCESS_TOKEN",
-        "user_id": "THREADS_USER_ID",
-    }
+    NAME = "threads"
+    # Each field reads from THREADS_<FIELD> when the admin UI has no value.
+    CREDENTIAL_FIELDS: ClassVar[tuple[str, ...]] = (
+        "access_token",
+        "user_id",
+    )
     CHAR_LIMIT = 500
 
     async def initialize_client(self) -> None:
