@@ -8,11 +8,11 @@ Supports three modes via CITYBOT_MODE env var:
 On first run with no city configured, starts web-only and directs
 the user to /setup to create an admin account and configure the city.
 """
-import os
-import sys
+
 import asyncio
 import logging
-import signal
+import os
+import sys
 import threading
 import time
 
@@ -40,7 +40,9 @@ def ensure_config():
     """Create a minimal credentials.env if missing so the web UI can start."""
     if not os.path.exists(CRED_PATH):
         with open(CRED_PATH, "w") as f:
-            f.write("# CityBot2 — finish setup at http://localhost:8080/setup\nCITY_NAME=\n")
+            f.write(
+                "# CityBot2 — finish setup at http://localhost:8080/setup\nCITY_NAME=\n"
+            )
         logger.info("Created default config — complete setup via the web UI")
 
 
@@ -50,6 +52,7 @@ def city_is_configured() -> bool:
         return True
     if os.path.exists(CRED_PATH):
         from dotenv import load_dotenv
+
         load_dotenv(CRED_PATH, override=False)
     return bool(os.getenv("CITY_NAME"))
 
@@ -65,8 +68,11 @@ def run_web():
         port=port,
         log_level="warning",
         access_log=False,
-        proxy_headers=True,          # trust X-Forwarded-For/Proto from Caddy/nginx
-        forwarded_allow_ips="*",     # allow any proxy (Docker network)
+        proxy_headers=True,
+        # Only these proxies may set X-Forwarded-For/Proto. Trusting "*" let
+        # any client fake its IP and get around the login rate limit. Set
+        # FORWARDED_ALLOW_IPS to Caddy's address (docker-compose does).
+        forwarded_allow_ips=os.getenv("FORWARDED_ALLOW_IPS", "127.0.0.1"),
     )
 
 

@@ -6,16 +6,18 @@
 - SQLAlchemy models in `database/models.py`
 
 ## Auto-fix guidelines
-- **Test command:** `python -m py_compile $(find . -name "*.py" ! -path "./.git/*" | tr "\n" " ") && echo "Syntax OK"`
-- No pytest suite — syntax check only
+- **Test command:** `scripts/ci-gates.sh` (ruff on changed files, py_compile, then pytest)
+- Tests live in `tests/` and run against a temp database and secret key, never `data/`. Install with `pip install -r requirements-dev.txt`, or point `CITYBOT_PYTHON` at a venv that has it
 - Only modify the file shown in the stack trace
 - Do not modify `config/cities/*.json` for code bugs
 - Async/await throughout — maintain async consistency
 - Env vars from `config/credentials.env.example` pattern (never hardcode)
 
 ## File map
-- `main.py` — entry point
+- `main.py`: bot loop (`python -m citybot` is the entry point)
+- `config.py`: `ConfigurationManager`. Never add `config/__init__.py`: it shadows `config.py` and breaks startup (`tests/test_config_import.py` guards this)
 - `monitors/` — earthquake, weather, news polling
-- `social_media/platforms/` — Bluesky, Twitter, Reddit, etc.
+- `social_media/platforms/`: Bluesky, Twitter, Reddit, etc. Meta Graph helpers live in `base.py`
+- `posting/queue_manager.py`: post queue: dedupe, schedule, quiet hours (city time), PostHistory
 - `web/app.py` — FastAPI admin dashboard
 - `database/models.py` — SQLAlchemy models

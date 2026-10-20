@@ -1,19 +1,20 @@
 """Consolidated social media formatters for CityBot2."""
 
 import logging
-from typing import List, Dict, Any, Optional
+from datetime import datetime, tzinfo
+from typing import Any
 
-from social_media.utils import PostContent, MediaContent
+from social_media.utils import MediaContent, PostContent
 
-logger = logging.getLogger('CityBot2.formatters')
+logger = logging.getLogger("CityBot2.formatters")
 
 
-def _build_hashtag_text(hashtags: List[str]) -> str:
+def _build_hashtag_text(hashtags: list[str]) -> str:
     """Build a hashtag string from a list of hashtag words (without '#' prefix)."""
-    return ' '.join(f"#{tag}" for tag in hashtags)
+    return " ".join(f"#{tag}" for tag in hashtags)
 
 
-def format_weather_for_social(weather_data: Any, hashtags: List[str]) -> PostContent:
+def format_weather_for_social(weather_data: Any, hashtags: list[str]) -> PostContent:
     """Format weather data for social media posting.
 
     Args:
@@ -24,12 +25,12 @@ def format_weather_for_social(weather_data: Any, hashtags: List[str]) -> PostCon
     hashtag_text = _build_hashtag_text(hashtags)
 
     if weather_data.temperature is not None:
-        temp_str = f"{int(round(weather_data.temperature))}°F"
+        temp_str = f"{round(weather_data.temperature)}°F"
     else:
         temp_str = "N/A"
 
     if weather_data.wind_speed is not None:
-        wind_str = f"{int(round(weather_data.wind_speed))}mph {weather_data.wind_direction}"
+        wind_str = f"{round(weather_data.wind_speed)}mph {weather_data.wind_direction}"
     else:
         wind_str = f"N/A {weather_data.wind_direction}"
 
@@ -47,57 +48,69 @@ def format_weather_for_social(weather_data: Any, hashtags: List[str]) -> PostCon
         media=MediaContent(
             image_path=weather_data.map_path,
             meta_title=f"{weather_data.city}, {weather_data.state} Weather Update",
-            meta_description=f"Current conditions: {temp_str}, {wind_str}"
-        )
+            meta_description=f"Current conditions: {temp_str}, {wind_str}",
+        ),
     )
 
 
-def format_weather_alert_for_social(alert: Any, hashtags: List[str]) -> PostContent:
+def format_weather_alert_for_social(
+    alert: Any, hashtags: list[str], tz: tzinfo | None = None
+) -> PostContent:
     """Format weather alert for social media posting.
 
     Args:
         alert: A WeatherAlert instance (or any object with event, headline,
             severity, urgency, areas, expires).
         hashtags: List of hashtag words.
+        tz: Time zone to show the expiry in (the city's). Defaults to the
+            alert's own offset.
     """
     hashtag_text = _build_hashtag_text(hashtags)
 
     severity_emoji = {
-        'Extreme': '\u26d4\ufe0f',
-        'Severe': '\U0001f6a8',
-        'Moderate': '\u26a0\ufe0f',
-        'Minor': '\U0001f4e2'
-    }.get(alert.severity, '\u26a0\ufe0f')
+        "Extreme": "\u26d4\ufe0f",
+        "Severe": "\U0001f6a8",
+        "Moderate": "\u26a0\ufe0f",
+        "Minor": "\U0001f4e2",
+    }.get(alert.severity, "\u26a0\ufe0f")
 
     text = (
         f"{severity_emoji} WEATHER ALERT {severity_emoji}\n\n"
         f"Type: {alert.event}\n"
         f"Areas: {alert.areas}\n\n"
         f"{alert.headline}\n\n"
-        f"Valid until: {alert.expires.strftime('%I:%M %p %Z')}\n\n"
+        f"{_format_expiry(alert.expires, tz)}"
         f"{hashtag_text}"
     )
 
     return PostContent(
         text=text,
         media=None,
-        platform_specific={
-            'alert_level': alert.severity,
-            'urgency': alert.urgency
-        }
+        platform_specific={"alert_level": alert.severity, "urgency": alert.urgency},
     )
 
 
-def format_earthquake_for_social(quake_data: Dict[str, Any], hashtags: List[str]) -> PostContent:
+def _format_expiry(expires: datetime | None, tz: tzinfo | None) -> str:
+    """'Valid until' line for an alert, or nothing when NWS gave no expiry."""
+    if expires is None:
+        return ""
+    if tz is not None and expires.tzinfo is not None:
+        expires = expires.astimezone(tz)
+    return f"Valid until: {expires.strftime('%b %d, %I:%M %p %Z').strip()}\n\n"
+
+
+def format_earthquake_for_social(
+    quake_data: dict[str, Any], hashtags: list[str]
+) -> PostContent:
     """Format earthquake update content into a PostContent object."""
     try:
-        magnitude = quake_data.get('magnitude')
-        location = quake_data.get('location')
-        depth = quake_data.get('depth')
-        distance = quake_data.get('distance')
-        city = quake_data.get('city')
-        state = quake_data.get('state')
-        url = quake_data.get('url')
+        magnitude = quake_data.get("magnitude")
+        location = quake_data.get("location")
+        depth = quake_data.get("depth")
+        distance = quake_data.get("distance")
+        city = quake_data.get("city")
+        state = quake_data.get("state")
+        url = quake_data.get("url")
 
         if magnitude is None:
             magnitude_emoji = "\U0001f7e2"
@@ -118,7 +131,7 @@ def format_earthquake_for_social(quake_data: Dict[str, Any], hashtags: List[str]
             f"{hashtag_text}"
         )
 
-        map_path = quake_data.get('map_path')
+        map_path = quake_data.get("map_path")
 
         return PostContent(
             text=text,
@@ -126,15 +139,15 @@ def format_earthquake_for_social(quake_data: Dict[str, Any], hashtags: List[str]
                 image_path=map_path,
                 link_url=url,
                 meta_title=f"M{magnitude} Earthquake near {city}, {state}",
-                meta_description=f"Earthquake detected {distance:.1f} miles from {city}"
-            )
+                meta_description=f"Earthquake detected {distance:.1f} miles from {city}",
+            ),
         )
-    except Exception as e:
-        logger.error("Error formatting earthquake content: %s", e, exc_info=True)
+    except Exception:
+        logger.exception("Error formatting earthquake content")
         raise
 
 
-def format_news_for_social(article: Any, hashtags: List[str]) -> PostContent:
+def format_news_for_social(article: Any, hashtags: list[str]) -> PostContent:
     """Format news article for social media posting.
 
     Args:
@@ -158,18 +171,20 @@ def format_news_for_social(article: Any, hashtags: List[str]) -> PostContent:
                 image_path=article.map_path,
                 link_url=article.url,
                 meta_title=article.title,
-                meta_description=article.content_snippet[:200]
-            )
+                meta_description=article.content_snippet[:200],
+            ),
         )
-    except (ValueError, OSError) as exc:
-        logger.error("Error formatting news content: %s", exc, exc_info=True)
+    except (ValueError, OSError):
+        logger.exception("Error formatting news content")
         raise
-    except (TypeError, AttributeError) as exc:
-        logger.error("Error formatting news content: %s", exc, exc_info=True)
+    except (TypeError, AttributeError):
+        logger.exception("Error formatting news content")
         raise
 
 
-def format_announcement_for_social(announcement: Dict[str, Any], hashtags: List[str]) -> PostContent:
+def format_announcement_for_social(
+    announcement: dict[str, Any], hashtags: list[str]
+) -> PostContent:
     """Format an announcement for social media posting.
 
     Args:
@@ -179,16 +194,12 @@ def format_announcement_for_social(announcement: Dict[str, Any], hashtags: List[
     """
     hashtag_text = _build_hashtag_text(hashtags)
 
-    title = announcement.get('title', 'Announcement')
-    body = announcement.get('body', '')
-    url = announcement.get('url')
-    image_path = announcement.get('image_path')
+    title = announcement.get("title", "Announcement")
+    body = announcement.get("body", "")
+    url = announcement.get("url")
+    image_path = announcement.get("image_path")
 
-    text = (
-        f"\U0001f4e3 {title}\n\n"
-        f"{body}\n\n"
-        f"{hashtag_text}"
-    )
+    text = f"\U0001f4e3 {title}\n\n{body}\n\n{hashtag_text}"
 
     media = None
     if image_path or url:
@@ -196,10 +207,7 @@ def format_announcement_for_social(announcement: Dict[str, Any], hashtags: List[
             image_path=image_path,
             link_url=url,
             meta_title=title,
-            meta_description=body[:200] if body else None
+            meta_description=body[:200] if body else None,
         )
 
-    return PostContent(
-        text=text,
-        media=media
-    )
+    return PostContent(text=text, media=media)

@@ -11,6 +11,7 @@ A bare `config/` directory with no `__init__.py` is safe: `config.py` still
 wins, and the directory is only ever used for file paths (`config/cities`,
 `config/credentials.env`).
 """
+
 import importlib.util
 import os
 import sys

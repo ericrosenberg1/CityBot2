@@ -23,6 +23,10 @@ services:
       CITYBOT_PORT: "8080"
       CITYBOT_DOMAIN: ${CITYBOT_DOMAIN:-}
       TZ: ${TZ:-America/Los_Angeles}
+      # Only Caddy (fixed address below) may set X-Forwarded-For.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.30.57.10}
+    networks:
+      - citybot
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
       interval: 30s
@@ -46,6 +50,8 @@ services:
     environment:
       CITYBOT_MODE: bot
       TZ: ${TZ:-America/Los_Angeles}
+    networks:
+      - citybot
     depends_on:
       web:
         condition: service_healthy
@@ -65,6 +71,9 @@ services:
       - caddy-config:/config
     environment:
       CITYBOT_DOMAIN: ${CITYBOT_DOMAIN:-localhost}
+    networks:
+      citybot:
+        ipv4_address: 172.30.57.10
     depends_on:
       - web
 
@@ -75,3 +84,9 @@ volumes:
   citybot-cache:
   caddy-data:
   caddy-config:
+
+networks:
+  citybot:
+    ipam:
+      config:
+        - subnet: 172.30.57.0/24

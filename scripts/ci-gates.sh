@@ -49,4 +49,18 @@ fi
 echo "==> py_compile"
 find . -name "*.py" -not -path "./venv/*" -not -path "./.venv/*" -print0 | xargs -0 python3 -m py_compile
 
+# Tests need the app's dependencies, so use a Python that has them:
+# $CITYBOT_PYTHON, then a repo venv. Install with: pip install -r requirements-dev.txt
+PY=""
+for c in "${CITYBOT_PYTHON:-}" ./venv/bin/python ./.venv/bin/python; do
+  [ -n "$c" ] && [ -x "$c" ] && "$c" -c "import pytest, fastapi" 2>/dev/null && PY="$c" && break
+done
+if [ -n "$PY" ]; then
+  echo "==> pytest"
+  SENTRY_DSN= "$PY" -m pytest -q -p no:cacheprovider tests
+else
+  echo "ci-gates: no Python with pytest and the app deps (set CITYBOT_PYTHON or build ./venv from requirements-dev.txt)"
+  exit 1
+fi
+
 echo "==> gates passed"

@@ -19,8 +19,7 @@ opencv-python-headless==5.0.0.93
 # stop arriving) and breaks `pip check` for zero reachable-code gain. Revisit when tweepy
 # relaxes the cap.
 tweepy==4.17.0
-facebook-sdk==3.1.0
-pillow==12.3.0
+pillow==13.0.0
 asyncpraw==8.0.3
 # 0.9.5 exists on PyPI but ships only a py2-none-any wheel and no sdist, so pip on
 # Python 3 cannot install it. 0.9.4 is the newest installable release. Verified 2026-10-12.
