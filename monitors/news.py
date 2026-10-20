@@ -6,7 +6,6 @@ import re
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 import aiohttp
@@ -47,8 +46,6 @@ class NewsMonitor:
         self.city_config = city_config
         self.rss_feeds = city_config["news"]["rss_feeds"]
         self.location_keywords = city_config["news"]["location_keywords"]
-        self.cache_dir = Path("cache/maps")
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
         # Every URL already scored, relevant or not, so an off-topic link (or
         # one that isn't a web page) is fetched once instead of every cycle.
         self._seen_urls: OrderedDict[str, None] = OrderedDict()

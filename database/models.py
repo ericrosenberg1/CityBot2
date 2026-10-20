@@ -11,9 +11,8 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    create_engine,
 )
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship
 
 logger = logging.getLogger("CityBot2.database")
 Base = declarative_base()
@@ -263,22 +262,3 @@ class PostQueue(Base):
     earthquake_id = Column(Integer, ForeignKey("earthquakes.id"), nullable=True)
     news_article_id = Column(Integer, ForeignKey("news_articles.id"), nullable=True)
     announcement_id = Column(Integer, ForeignKey("announcements.id"), nullable=True)
-
-
-def create_database(database_url: str):
-    """
-    Create database engine and session factory.
-
-    Args:
-        database_url: SQLAlchemy database connection URL
-    Returns:
-        Tuple of (engine, SessionLocal)
-    """
-    try:
-        engine = create_engine(database_url, echo=False)
-        Base.metadata.create_all(engine)
-        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        return engine, SessionLocal
-    except Exception as e:
-        logger.error(f"Error creating database: {e!s}")
-        raise

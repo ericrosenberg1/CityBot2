@@ -25,18 +25,6 @@ class TwitterPlatform(SocialPlatform):
         super().__init__(platform_config, city_config)
         self._api = None
 
-    @staticmethod
-    def validate_config(config: dict[str, Any]) -> tuple[bool, str | None]:
-        """Validate Twitter platform configuration."""
-        required_fields = ["api_key", "api_secret", "access_token", "access_secret"]
-        credentials = config.get("credentials", {})
-        if not credentials:
-            return False, "No credentials provided"
-        missing = [f for f in required_fields if not credentials.get(f)]
-        if missing:
-            return False, f"Missing required credentials: {', '.join(missing)}"
-        return True, None
-
     async def initialize_client(self) -> None:
         """Initialize X.com (Twitter) client."""
         try:

@@ -1,15 +1,8 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from social_media.formatters import (
-    format_announcement_for_social,
-    format_earthquake_for_social,
-    format_news_for_social,
-    format_weather_alert_for_social,
-    format_weather_for_social,
-)
 from social_media.utils import ContentValidator, PostContent, RateLimiter
 
 from .platforms.base import SocialPlatform
@@ -21,9 +14,6 @@ from .platforms.nextdoor import NextdoorPlatform
 from .platforms.reddit import RedditPlatform
 from .platforms.threads import ThreadsPlatform
 from .platforms.twitter import TwitterPlatform
-
-if TYPE_CHECKING:
-    from monitors.weather import WeatherAlert, WeatherData
 
 logger = logging.getLogger("CityBot2.social.manager")
 
@@ -152,35 +142,6 @@ class SocialMediaManager:
         if not await self.rate_limiter.can_post(name, post_type):
             return False, "Rate limit exceeded"
         return True, None
-
-    # ── convenience posting methods ──────────────────────────────────
-
-    def _hashtags(self, category: str) -> list[str]:
-        return self.city_config.get("social", {}).get("hashtags", {}).get(category, [])
-
-    async def post_weather(self, weather_data: "WeatherData") -> dict[str, PostResult]:
-        content = format_weather_for_social(weather_data, self._hashtags("weather"))
-        return await self.post_content(content, "weather")
-
-    async def post_weather_alert(self, alert: "WeatherAlert") -> dict[str, PostResult]:
-        content = format_weather_alert_for_social(alert, self._hashtags("weather"))
-        return await self.post_content(content, "weather")
-
-    async def post_earthquake(
-        self, quake_data: dict[str, Any]
-    ) -> dict[str, PostResult]:
-        content = format_earthquake_for_social(quake_data, self._hashtags("earthquake"))
-        return await self.post_content(content, "earthquake")
-
-    async def post_news(self, article: Any) -> dict[str, PostResult]:
-        content = format_news_for_social(article, self._hashtags("news"))
-        return await self.post_content(content, "news")
-
-    async def post_announcement(
-        self, announcement: dict[str, Any]
-    ) -> dict[str, PostResult]:
-        content = format_announcement_for_social(announcement, self._hashtags("news"))
-        return await self.post_content(content, "announcement")
 
     async def close(self) -> None:
         close_tasks = [
