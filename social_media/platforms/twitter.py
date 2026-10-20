@@ -13,12 +13,14 @@ logger = logging.getLogger(__name__)
 class TwitterPlatform(SocialPlatform):
     """X.com (Twitter) platform implementation."""
 
-    CREDENTIAL_MAP: ClassVar[dict[str, str]] = {
-        "api_key": "TWITTER_API_KEY",
-        "api_secret": "TWITTER_API_SECRET",
-        "access_token": "TWITTER_ACCESS_TOKEN",
-        "access_secret": "TWITTER_ACCESS_SECRET",
-    }
+    NAME = "twitter"
+    # Each field reads from TWITTER_<FIELD> when the admin UI has no value.
+    CREDENTIAL_FIELDS: ClassVar[tuple[str, ...]] = (
+        "api_key",
+        "api_secret",
+        "access_token",
+        "access_secret",
+    )
     CHAR_LIMIT = 280
 
     def __init__(self, platform_config: dict[str, Any], city_config: dict[str, Any]):

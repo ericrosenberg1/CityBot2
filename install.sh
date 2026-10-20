@@ -61,8 +61,9 @@ if [[ "$METHOD" == "docker" ]]; then
     # Ensure docker compose is available
     if ! docker compose version &>/dev/null 2>&1; then
         info "Installing Docker Compose plugin …"
-        apt-get update -qq && apt-get install -y -qq docker-compose-plugin >/dev/null 2>&1 \
-            || fail "Could not install docker-compose-plugin. Install Docker first: https://docs.docker.com/engine/install/"
+        if ! { apt-get update -qq && apt-get install -y -qq docker-compose-plugin >/dev/null 2>&1; }; then
+            fail "Could not install docker-compose-plugin. Install Docker first: https://docs.docker.com/engine/install/"
+        fi
     fi
 
     # Write .env
@@ -153,6 +154,7 @@ WorkingDirectory=$DIR
 ExecStart=$DIR/venv/bin/python -m citybot
 Restart=on-failure
 RestartSec=5
+Environment=CITYBOT_HOST=0.0.0.0
 Environment=CITYBOT_PORT=$PORT
 Environment=CITYBOT_MODE=all
 Environment=CITYBOT_DOMAIN=$DOMAIN

@@ -18,10 +18,12 @@ class FacebookPlatform(SocialPlatform):
     can't target any Graph API version newer than 3.1.
     """
 
-    CREDENTIAL_MAP: ClassVar[dict[str, str]] = {
-        "page_id": "FACEBOOK_PAGE_ID",
-        "access_token": "FACEBOOK_ACCESS_TOKEN",
-    }
+    NAME = "facebook"
+    # Each field reads from FACEBOOK_<FIELD> when the admin UI has no value.
+    CREDENTIAL_FIELDS: ClassVar[tuple[str, ...]] = (
+        "page_id",
+        "access_token",
+    )
     CHAR_LIMIT = 63206
 
     async def initialize_client(self) -> None:

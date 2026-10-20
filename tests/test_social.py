@@ -1,5 +1,6 @@
 import asyncio
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -108,3 +109,22 @@ def test_location_map_is_none_without_cutycapt(tmp_path, monkeypatch):
         asyncio.run(maps.generate_location_map({"latitude": 34.3, "longitude": -119.3}))
         is None
     )
+
+
+def test_credential_env_vars_keep_their_documented_names():
+    # config.py, the web form and each platform used to keep separate copies
+    # of these names. They now all come from CREDENTIAL_FIELDS.
+    from social_media.social_media_manager import PLATFORM_CLASSES
+
+    assert (
+        PLATFORM_CLASSES["twitter"].credential_env_vars()["access_secret"]
+        == "TWITTER_ACCESS_SECRET"
+    )
+    assert PLATFORM_CLASSES["instagram"].credential_env_vars() == {
+        "access_token": "INSTAGRAM_ACCESS_TOKEN",
+        "business_account_id": "INSTAGRAM_BUSINESS_ACCOUNT_ID",
+    }
+    example = Path("config/credentials.env.example").read_text()
+    for cls in PLATFORM_CLASSES.values():
+        for env_var in cls.credential_env_vars().values():
+            assert env_var in example, env_var

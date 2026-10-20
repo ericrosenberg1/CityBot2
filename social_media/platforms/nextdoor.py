@@ -23,10 +23,12 @@ NEXTDOOR_API_BASE = "https://nextdoor.com/api/v2"
 class NextdoorPlatform(SocialPlatform):
     """Nextdoor platform implementation using the Nextdoor API v2."""
 
-    CREDENTIAL_MAP: ClassVar[dict[str, str]] = {
-        "access_token": "NEXTDOOR_ACCESS_TOKEN",
-        "agency_id": "NEXTDOOR_AGENCY_ID",
-    }
+    NAME = "nextdoor"
+    # Each field reads from NEXTDOOR_<FIELD> when the admin UI has no value.
+    CREDENTIAL_FIELDS: ClassVar[tuple[str, ...]] = (
+        "access_token",
+        "agency_id",
+    )
     CHAR_LIMIT = 10000
 
     async def initialize_client(self) -> None:

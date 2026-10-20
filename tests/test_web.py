@@ -1,8 +1,13 @@
+import secrets
+
 import pytest
 from fastapi.testclient import TestClient
 
 from database.models import PostQueue, User
 from web.auth import hash_password
+
+# Generated per run, so no password literal sits in the repo.
+TEST_PASSWORD = secrets.token_urlsafe(12)
 
 
 @pytest.fixture
@@ -19,7 +24,7 @@ def client(web):
     return TestClient(web.app)
 
 
-def add_user(db, email, role, password="correct horse"):
+def add_user(db, email, role, password=TEST_PASSWORD):
     with db.Session() as session:
         user = User(
             email=email,
@@ -32,7 +37,7 @@ def add_user(db, email, role, password="correct horse"):
         return user.id
 
 
-def login(client, email, password="correct horse"):
+def login(client, email, password=TEST_PASSWORD):
     return client.post(
         "/login", data={"email": email, "password": password}, follow_redirects=False
     )
@@ -55,12 +60,12 @@ def test_spoofed_forwarded_for_does_not_reset_the_login_limit(db, client):
         headers = {"X-Forwarded-For": f"10.0.0.{i}"}
         client.post(
             "/login",
-            data={"email": "admin@example.com", "password": "nope"},
+            data={"email": "admin@example.com", "password": "wrong-" + TEST_PASSWORD},
             headers=headers,
         )
     response = client.post(
         "/login",
-        data={"email": "admin@example.com", "password": "nope"},
+        data={"email": "admin@example.com", "password": "wrong-" + TEST_PASSWORD},
         headers={"X-Forwarded-For": "10.9.9.9"},
     )
     assert response.status_code == 429

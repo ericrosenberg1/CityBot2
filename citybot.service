@@ -13,6 +13,7 @@ WorkingDirectory=/opt/citybot2
 ExecStart=/opt/citybot2/venv/bin/python -m citybot
 Restart=on-failure
 RestartSec=5
+Environment=CITYBOT_HOST=0.0.0.0
 Environment=CITYBOT_PORT=8080
 Environment=CITYBOT_MODE=all
 Environment=TZ=America/Los_Angeles
