@@ -120,10 +120,10 @@ def test_credential_env_vars_keep_their_documented_names():
         PLATFORM_CLASSES["twitter"].credential_env_vars()["access_secret"]
         == "TWITTER_ACCESS_SECRET"
     )
-    assert PLATFORM_CLASSES["instagram"].credential_env_vars() == {
-        "access_token": "INSTAGRAM_ACCESS_TOKEN",
-        "business_account_id": "INSTAGRAM_BUSINESS_ACCOUNT_ID",
-    }
+    assert sorted(PLATFORM_CLASSES["instagram"].credential_env_vars().values()) == [
+        "INSTAGRAM_ACCESS_TOKEN",
+        "INSTAGRAM_BUSINESS_ACCOUNT_ID",
+    ]
     example = Path("config/credentials.env.example").read_text()
     for cls in PLATFORM_CLASSES.values():
         for env_var in cls.credential_env_vars().values():

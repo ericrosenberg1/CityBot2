@@ -196,7 +196,7 @@ class LocationMapGenerator:
         try:
             m.save(html_path)
             if shutil.which("cutycapt"):
-                subprocess.run(  # nosec B603 - fixed argv, no shell, paths we generate
+                subprocess.run(  # nosec B603 B607 - fixed argv, no shell, cutycapt found on PATH by shutil.which
                     ["cutycapt", f"--url=file://{html_path}", f"--out={image_path}"],
                     timeout=30,
                     check=False,
