@@ -377,7 +377,9 @@ async def feed_page(request: Request):
             try:
                 q = session.query(PostQueue).filter(
                     PostQueue.status == "posted",
-                    PostQueue.is_public == True,
+                    # is_public is nullable, so .is_(True) and == True both drop
+                    # NULL rows. .is_(True) is the form ruff's E712 accepts.
+                    PostQueue.is_public.is_(True),
                 )
                 if current_type:
                     q = q.filter(PostQueue.content_type == current_type)
