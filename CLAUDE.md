@@ -21,7 +21,3 @@
 - `posting/queue_manager.py`: post queue: dedupe, schedule, quiet hours (city time), PostHistory
 - `web/app.py` — FastAPI admin dashboard
 - `database/models.py` — SQLAlchemy models
-
-## Writing voice
-
-Every word of prose in this repo follows Eric's voice card at `~/Code/content-toolkit/voice/voice-card.md`. That covers UI copy, emails, docs, release notes, store listings, commit messages, and PR bodies. Read the card for the rules, and its "The gate" section for the checks and the bar. Never paste either into this file, since a copy drifts.
